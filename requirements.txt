@@ -1,0 +1,14 @@
+streamlit
+streamlit-highcharts
+streamlit-option-menu
+streamlit-extras
+nltk
+pandas
+plotly
+textblob
+numpy
+google-auth
+google-cloud-translate
+python-dotenv
+kaleido
+smtplib
