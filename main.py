@@ -24,9 +24,18 @@ genai.configure(
 )
 
 # Initialize chat
-model = genai.GenerativeModel(
-    "gemini-1.5-pro-latest"
-)
+# model = genai.GenerativeModel(
+#     "gemini-1.5-pro-latest"
+# )
+try:
+    model = genai.GenerativeModel(
+        "gemini-1.5-pro-latest"
+    )
+    chat = model.start_chat()
+except Exception as e:
+    st.error(f"Failed to initialize GenerativeModel: {e}")
+    raise
+
 chat = model.start_chat()
 
 # Helper function to generate a response
