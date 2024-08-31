@@ -1503,6 +1503,7 @@ elif options == "Report":
 
         if report_type == "Full Report":
             # Create a full report as a CSV
+            plot_heatmap()
             report = df.to_csv(index=False)
         elif report_type == "Summary Report":
             # Create a summary report, e.g., by counting mentions per company
@@ -1611,7 +1612,7 @@ try:
         scopes=['https://www.googleapis.com/auth/cloud-platform']
     )
 
-    # Initialize the translate client with the credentials
+    # Initialize the translation client with the credentials
     client = translate.Client(credentials=credentials)
 
 except FileNotFoundError:
