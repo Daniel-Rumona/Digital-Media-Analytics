@@ -1,4 +1,12 @@
+import sys
+sys.path.append(r'C:\Users\admin\AppData\Local\Programs\Python\Python312\Lib\site-packages')
+
 import streamlit as st
+
+# Set page config at the very beginning
+st.set_page_config(page_title='Social Media Analytics', page_icon='💹', layout="wide")
+
+# All other imports
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import json
@@ -16,6 +24,68 @@ from streamlit_extras.metric_cards import style_metric_cards
 import re
 from collections import Counter
 import calendar
+import time
+from datetime import datetime, timedelta
+
+
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+import random
+
+
+import google.cloud.translate_v2 as translate
+from google.oauth2 import service_account
+
+
+import google.cloud.translate_v2 as translate
+from google.oauth2 import service_account
+
+
+
+import base64
+from io import BytesIO
+import plotly.io as pio
+
+import uuid
+import re
+
+
+import streamlit as st
+import pandas as pd
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import threading
+import time
+from datetime import datetime, timedelta
+
+
+
+def export_csv(data, filename="social_media_data.csv", button_text="Download CSV File"):
+    """
+    Creates a download button for a pandas DataFrame as a CSV file.
+    """
+    csv = data.to_csv(index=False)
+    return create_download_button(csv, filename, button_text)
+
+def export_chart_as_png(fig, filename="chart.png", button_text="Download Chart as PNG"):
+    """
+    Creates a download button for a plotly figure as a PNG image.
+    If kaleido is not installed, provides a message to install it.
+    """
+    try:
+        img = pio.to_image(fig, format="png")
+        return create_download_button(img, filename, button_text)
+    except ValueError as e:
+        if "kaleido" in str(e):
+            return "To enable chart downloads, please install the kaleido package: `pip install -U kaleido`"
+        else:
+            raise e
+
+
+
+
 
 load_dotenv()
 # Configure the Google Generative AI API
@@ -34,10 +104,7 @@ def respond(user_input, instruction=""):
     response = chat.send_message(instruction + user_input)
     return response.text
 
-# Set up the page configuration
-st.set_page_config(page_title='Social Media Analytics',
-                   page_icon='💹',
-                   layout="wide")
+
 
 # Title of the app
 st.title(':red[Social] Media :red[Analytics]')
@@ -45,12 +112,13 @@ st.title(':red[Social] Media :red[Analytics]')
 # Option menu for navigation
 with st.sidebar:
     options = option_menu(
-        menu_title="Main Menu",  # You can customize the title here
-        options=["Dashboard", "Platform Specific", "Gen AI", "Sentiment Analysis", "World View"],
-        icons=["exclude", "slack", "chat-quote", "emoji-smile", 'globe'],
-        menu_icon="cast",
-        default_index=0,  # Set Platform Specific as default for this example
-        orientation="vertical",
+    menu_title="Main Menu",
+    options=["Dashboard", "Platform Specific", "Gen AI", "Sentiment Analysis", "World View", "Live Updates", "Report"],
+    icons=["exclude", "slack", "chat-quote", "emoji-smile", 'globe', 'graph-up', 'file-earmark-text'],
+    menu_icon="cast",
+    default_index=0,
+    orientation="vertical",
+
     )
 
 @st.cache_data
@@ -611,6 +679,7 @@ elif options == "Gen AI":
             data = json.load(file)
         return data
     data = load_data()
+    
     # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -635,6 +704,9 @@ elif options == "Gen AI":
             st.markdown(response)
         # Add assistant response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
+
+
+
 elif options == "Sentiment Analysis":
     data = load_data()
     target_col, month_col, chart_col = st.columns(3)
@@ -970,3 +1042,684 @@ elif options == "World View":
                          max_value=max(df_top_locations.Mentions),
                      )}
                  )
+        
+
+@st.cache_data
+def load_data():
+    with open("data-sources/Mentions-Data.json") as file:
+        data = json.load(file)
+    return data
+
+def generate_live_updates(data, speed=1):
+    """
+    Generator function to provide live updates.
+    :param data: The loaded JSON data
+    :param speed: Speed multiplier for updates (default is 1)
+    """
+    all_mentions = []
+    for company in data.values():
+        all_mentions.extend(company['mentions'])
+    
+    # Sort mentions by date
+    all_mentions.sort(key=lambda x: x['date'])
+    
+    # Get the earliest and latest dates
+    start_date = datetime.strptime(all_mentions[0]['date'], '%Y-%m-%d')
+    end_date = datetime.strptime(all_mentions[-1]['date'], '%Y-%m-%d')
+    
+    current_date = start_date
+    current_index = 0
+    
+    while current_date <= end_date:
+        # Get all mentions for the current date
+        current_mentions = [
+            mention for mention in all_mentions[current_index:]
+            if datetime.strptime(mention['date'], '%Y-%m-%d') <= current_date
+        ]
+        
+        yield current_date, current_mentions
+        
+        current_index += len(current_mentions)
+        current_date += timedelta(days=1)
+        time.sleep(1 / speed)  # Adjust speed of updates
+
+def display_live_updates(data, translations):
+    st.title(translations["live_updates_title"])
+    
+    if 'running' not in st.session_state:
+        st.session_state.running = False
+    
+    start_stop = st.button(translations["start_stop_button"])
+    if start_stop:
+        st.session_state.running = not st.session_state.running
+
+    if st.session_state.running:
+        st.markdown("""
+        <style>
+        .container {padding-top: 2rem;}
+        .row {display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem;}
+        .col {flex-basis: calc(50% - 1rem); margin-right: 1rem;}
+        </style>
+        """, unsafe_allow_html=True)
+
+        container = st.container()
+
+        with container:
+            row1 = st.container()
+            row2 = st.container()
+            row3 = st.container()
+
+            # Social Media Metrics
+            with row1:
+                st.subheader(translations["social_media_metrics"])
+                metrics = [
+                    (_("Mentions"), f"{data['mentions'].iloc[-1]:,}", f"{data['mentions'].pct_change().iloc[-1]*100:.2f}%"),
+                    (_("Unique Users"), f"{data['unique_users'].iloc[-1]:,}", f"{data['unique_users'].pct_change().iloc[-1]*100:.2f}%"),
+                    (_("Engagement Rate"), f"{data['engagement_rate'].iloc[-1]:.2f}%", f"+{data['engagement_rate'].pct_change().iloc[-1]*100:.2f}%"),
+                    (_("Sentiment Score"), f"{data['sentiment_score'].iloc[-1]:.4f}", f"+{data['sentiment_score'].pct_change().iloc[-1]*100:.2f}%"),
+                    (_("Total Users"), f"{data['total_users'].iloc[-1]:,}", f"+{data['total_users'].pct_change().iloc[-1]*100:.2f}%")
+                ]
+                for metric, value, delta in metrics:
+                    st.metric(metric, value, delta)
+
+            # Platform Performance
+            with row2:
+                st.subheader(translations["platform_performance"])
+                platforms = ['Facebook', 'Instagram', 'Twitter', 'LinkedIn', 'YouTube']
+                for platform in platforms:
+                    st.metric(_(platform), f"{random.randint(500, 1500):,}", f"+{random.uniform(-5, 5):.2f}%")
+
+            # Audience Insights
+            with row3:
+                st.subheader(translations["audience_insights"])
+                total_users = data['total_users'].iloc[-1]
+                age_groups = {
+                    _("18 - 24 years"): data['age_group_1824'].iloc[-1],
+                    _("25 - 40 years"): data['age_group_2530'].iloc[-1],
+                    _("40 - 55 years"): data['age_group_4055'].iloc[-1],
+                    _("55+ years"): data['age_group_5565plus'].iloc[-1]
+                }
+                
+                # Create a pie chart for age groups
+                chart_data = {
+                    "labels": list(age_groups.keys()),
+                    "values": list(age_groups.values()),
+                    "colors": ["#FFD700", "#32CD32", "#FF8C00", "#4169E1"],
+                    "title": translations["age_distribution_title"],
+                    "showlegend": True,
+                    "legend_title": translations["legend_title"]
+                }
+                
+                # Display the pie chart
+                pie_chart = create_pie_chart(chart_data)
+                st.plotly_chart(pie_chart, use_container_width=True)
+
+            # Add export options
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(export_csv(data), unsafe_allow_html=True)
+            with col2:
+                export_result = export_chart_as_png(pie_chart)
+                if isinstance(export_result, str) and "kaleido" in export_result:
+                    st.warning(export_result)
+                else:
+                    st.markdown(export_result, unsafe_allow_html=True)
+
+        for date, updates in generate_live_updates(data, speed=1):
+            if not st.session_state.running:
+                break
+            
+            # Update metrics and charts here
+            time.sleep(1)  # Update every second
+    else:
+        st.info(translations["info_message"])
+
+
+
+
+# Get the path to your JSON file
+json_file_path = os.path.join(os.getcwd(), "data-sources", "digital-ma-434202-d2311a8c7167.json")
+
+try:
+    # Load credentials
+    credentials = service_account.Credentials.from_service_account_file(
+        json_file_path,
+        scopes=['https://www.googleapis.com/auth/cloud-platform']
+    )
+
+    # Initialize the translate client with the credentials
+    client = translate.Client(credentials=credentials)
+
+except FileNotFoundError:
+    st.error(f"Service account JSON file not found at {json_file_path}. Please check the file path.")
+    st.stop()
+except Exception as e:
+    st.error(f"An error occurred while setting up the Google Cloud client: {str(e)}")
+    st.stop()
+
+# Define available languages
+LANGUAGES = {
+    'English': 'en',
+    'Spanish': 'es',
+    'French': 'fr',
+    'German': 'de',
+    'Italian': 'it',
+    'Portuguese': 'pt',
+    'Russian': 'ru',
+    'Japanese': 'ja',
+    'Korean': 'ko',
+    'Chinese (Simplified)': 'zh-CN',
+    'Arabic': 'ar',
+    'Hindi': 'hi',
+    'Zulu': 'zu',
+    'Xhosa': 'xh',
+    'Afrikaans': 'af'
+}
+
+def translate_text(text, target_language):
+    try:
+        result = client.translate(text, target_language=target_language)
+        return result['translatedText']
+    except Exception as e:
+        st.error(f"Translation error: {str(e)}")
+        return text
+
+def _(message):
+    if st.session_state.lang != 'en':
+        return translate_text(message, st.session_state.lang)
+    return message
+
+def load_translations(lang):
+    translations = {
+        "dashboard_title": _("Dashboard"),
+        "overview": _("Overview"),
+        "platform_specific_title": _("Platform Specific"),
+        "platform_metrics": _("Platform Metrics"),
+        "gen_ai_title": _("Gen AI"),
+        "ai_insights": _("AI Insights"),
+        "sentiment_analysis_title": _("Sentiment Analysis"),
+        "sentiment_breakdown": _("Sentiment Breakdown"),
+        "world_view_title": _("World View"),
+        "global_reach": _("Global Reach"),
+        "live_updates_title": _("Digital Media Analytics Live Updates"),
+        "start_stop_button": _("Start/Stop Live Updates"),
+        "social_media_metrics": _("Social Media Metrics"),
+        "platform_performance": _("Platform Performance"),
+        "audience_insights": _("Audience Insights"),
+        "age_distribution_title": _("Age Group Distribution"),
+        "legend_title": _("Age Groups"),
+        "info_message": _("Click 'Start/Stop Live Updates' to begin"),
+        "download_csv": _("Download CSV"),
+        "download_chart": _("Download Chart"),
+        "export_data": _("Export Data"),
+        "export_chart": _("Export Chart"),
+    
+    }
+    return translations
+
+def load_data():
+    # Replace this with your actual data loading logic
+    df = pd.DataFrame({
+        'mentions': [100, 200, 300],
+        'unique_users': [80, 90, 95],
+        'engagement_rate': [60, 62, 64],
+        'sentiment_score': [0.7, 0.75, 0.8],
+        'total_users': [800, 820, 840],
+        'age_group_1824': [20, 22, 24],
+        'age_group_2530': [45, 47, 49],
+        'age_group_4055': [15, 17, 19],
+        'age_group_5565plus': [10, 12, 14]
+    })
+    return df
+
+def display_dashboard(data, translations):
+    st.title(translations["dashboard_title"])
+    st.subheader(translations["overview"])
+    st.metric(_("Mentions"), f"{data['mentions'].iloc[-1]:,}", f"+{data['mentions'].pct_change().iloc[-1]*100:.2f}%")
+    st.metric(_("Unique Users"), f"{data['unique_users'].iloc[-1]:,}", f"-{data['unique_users'].pct_change().iloc[-1]*100:.2f}%")
+    st.metric(_("Engagement Rate"), f"{data['engagement_rate'].iloc[-1]:.2f}%", f"+{data['engagement_rate'].pct_change().iloc[-1]*100:.2f}%")
+    st.metric(_("Sentiment Score"), f"{data['sentiment_score'].iloc[-1]:.4f}", f"+{data['sentiment_score'].pct_change().iloc[-1]*100:.2f}%")
+    st.metric(_("Total Users"), f"{data['total_users'].iloc[-1]:,}", f"+{data['total_users'].pct_change().iloc[-1]*100:.2f}%")
+
+    # Add export option for dashboard data
+    st.markdown(export_csv(data), unsafe_allow_html=True)
+
+def display_platform_specific(data, translations):
+    st.title(translations["platform_specific_title"])
+    st.subheader(translations["platform_metrics"])
+    platforms = ['Facebook', 'Instagram', 'Twitter', 'LinkedIn', 'YouTube']
+    for platform in platforms:
+        st.metric(_(platform), f"{random.randint(500, 1500):,}", f"+{random.uniform(-5, 5):.2f}%")
+
+
+  # Create a bar chart for platform performance
+    platforms = ['Facebook', 'Instagram', 'Twitter', 'LinkedIn', 'YouTube']
+    values = [random.randint(500, 1500) for _ in platforms]
+    fig = go.Figure(data=[go.Bar(x=platforms, y=values)])
+    fig.update_layout(title=translations["platform_performance"])
+    
+    st.plotly_chart(fig)
+    
+    # Add export options
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(export_csv(pd.DataFrame({'Platform': platforms, 'Value': values})), unsafe_allow_html=True)
+    with col2:
+        st.markdown(export_chart_as_png(fig), unsafe_allow_html=True)
+
+
+def display_gen_ai(data, translations):
+    st.title(translations["gen_ai_title"])
+    st.subheader(translations["ai_insights"])
+    ai_insights = [
+        (_("Improved Sentiment Analysis Accuracy"), f"{random.uniform(70, 85):.2f}%"),
+        (_("Enhanced Topic Modeling Efficiency"), f"{random.uniform(30, 50):.2f}%"),
+        (_("Increased Natural Language Processing Speed"), f"{random.uniform(20, 40):.2f}%")
+    ]
+    for insight, improvement in ai_insights:
+        st.metric(insight, improvement)
+
+def display_sentiment_analysis(data, translations):
+    st.title(translations["sentiment_analysis_title"])
+    st.subheader(translations["sentiment_breakdown"])
+    sentiments = [_('Positive'), _('Negative'), _('Neutral')]
+    for sentiment in sentiments:
+        st.metric(sentiment, f"{random.randint(100, 500):,}", f"{random.uniform(-5, 5):.2f}%")
+
+def display_world_view(data, translations):
+    st.title(translations["world_view_title"])
+    st.subheader(translations["global_reach"])
+    countries = [_('USA'), _('UK'), _('Germany'), _('France'), _('Australia')]
+    for country in countries:
+        st.metric(country, f"{random.randint(100000, 500000):,}", f"{random.uniform(-5, 5):.2f}%")
+
+def display_live_updates(data, translations):
+    st.title(translations["live_updates_title"])
+    
+    if 'running' not in st.session_state:
+        st.session_state.running = False
+    
+    start_stop = st.button(translations["start_stop_button"])
+    if start_stop:
+        st.session_state.running = not st.session_state.running
+
+    if st.session_state.running:
+        st.markdown("""
+        <style>
+        .container {padding-top: 2rem;}
+        .row {display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem;}
+        .col {flex-basis: calc(50% - 1rem); margin-right: 1rem;}
+        </style>
+        """, unsafe_allow_html=True)
+
+        container = st.container()
+
+        with container:
+            row1 = st.container()
+            row2 = st.container()
+            row3 = st.container()
+
+            # Social Media Metrics
+            with row1:
+                st.subheader(translations["social_media_metrics"])
+                metrics = [
+                    (_("Mentions"), f"{data['mentions'].iloc[-1]:,}", f"{data['mentions'].pct_change().iloc[-1]*100:.2f}%"),
+                    (_("Unique Users"), f"{data['unique_users'].iloc[-1]:,}", f"{data['unique_users'].pct_change().iloc[-1]*100:.2f}%"),
+                    (_("Engagement Rate"), f"{data['engagement_rate'].iloc[-1]:.2f}%", f"+{data['engagement_rate'].pct_change().iloc[-1]*100:.2f}%"),
+                    (_("Sentiment Score"), f"{data['sentiment_score'].iloc[-1]:.4f}", f"+{data['sentiment_score'].pct_change().iloc[-1]*100:.2f}%"),
+                    (_("Total Users"), f"{data['total_users'].iloc[-1]:,}", f"+{data['total_users'].pct_change().iloc[-1]*100:.2f}%")
+                ]
+                for metric, value, delta in metrics:
+                    st.metric(metric, value, delta)
+
+            # Platform Performance
+            with row2:
+                st.subheader(translations["platform_performance"])
+                platforms = ['Facebook', 'Instagram', 'Twitter', 'LinkedIn', 'YouTube']
+                for platform in platforms:
+                    st.metric(_(platform), f"{random.randint(500, 1500):,}", f"+{random.uniform(-5, 5):.2f}%")
+
+            # Audience Insights
+            with row3:
+                st.subheader(translations["audience_insights"])
+                total_users = data['total_users'].iloc[-1]
+                age_groups = {
+                    _("18 - 24 years"): data['age_group_1824'].iloc[-1],
+                    _("25 - 40 years"): data['age_group_2530'].iloc[-1],
+                    _("40 - 55 years"): data['age_group_4055'].iloc[-1],
+                    _("55+ years"): data['age_group_5565plus'].iloc[-1]
+                }
+                
+                # Create a pie chart for age groups
+                chart_data = {
+                    "labels": list(age_groups.keys()),
+                    "values": list(age_groups.values()),
+                    "colors": ["#FFD700", "#32CD32", "#FF8C00", "#4169E1"],
+                    "title": translations["age_distribution_title"],
+                    "showlegend": True,
+                    "legend_title": translations["legend_title"]
+                }
+                
+                # Create and display the pie chart
+                pie_chart = create_pie_chart(chart_data)
+                st.plotly_chart(pie_chart, use_container_width=True)
+
+            # Add export options
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(export_csv(data), unsafe_allow_html=True)
+            with col2:
+                st.markdown(export_chart_as_png(pie_chart), unsafe_allow_html=True)
+
+        for date, updates in generate_live_updates(data, speed=1):
+            if not st.session_state.running:
+                break
+            
+            # Update metrics and charts here
+            time.sleep(1)  # Update every second
+    else:
+        st.info(translations["info_message"])
+
+
+def create_pie_chart(data):
+    fig = go.Figure(data=[go.Pie(labels=data['labels'], values=data['values'])])
+    fig.update_layout(title=data['title'])
+    fig.update_traces(hole=.3)
+    fig.update_layout(legend=dict(yanchor="top", y=0.99, xanchor="right", x=1.05))
+    return fig
+
+def generate_live_updates(data, speed=1):
+    current_time = datetime.now()
+    for hour in range(24):
+        yield (current_time.strftime("%H:%M"), {
+            'mentions': random.randint(900, 1100),
+            'unique_users': random.randint(750, 950),
+            'engagement_rate': random.uniform(63, 67),
+            'sentiment_score': random.uniform(0.74, 0.76),
+            'total_users': random.randint(810, 850),
+            'age_group_1824': random.randint(21, 23),
+            'age_group_2530': random.randint(46, 48),
+            'age_group_4055': random.randint(15, 17),
+            'age_group_5565plus': random.randint(10, 12)
+        })
+        time.sleep(speed * 3600)  # Sleep for 1 hour
+
+def main():
+    # Load data
+    data = load_data()
+
+    # Initialize session state
+    if 'lang' not in st.session_state:
+        st.session_state.lang = 'en'
+
+    # Add language selection to the sidebar
+    st.sidebar.title(_("Language Settings"))
+    selected_language = st.sidebar.selectbox(
+        _("Select your preferred language"),
+        options=list(LANGUAGES.keys()),
+        index=list(LANGUAGES.values()).index(st.session_state.lang)
+    )
+
+    # Update the session state with the selected language
+    st.session_state.lang = LANGUAGES[selected_language]
+
+    # Load translations
+    translations = load_translations(st.session_state.lang)
+
+    # Define a dictionary to map option names to corresponding functions
+    display_functions = {
+      
+        _("Live Updates"): display_live_updates,
+       
+    }
+
+    # Get selected option
+    options = st.selectbox(
+        _("Select a module:"),
+        options=list(display_functions.keys())
+    )
+
+    # Call the appropriate function based on the selected option
+    display_functions[options](data, translations)
+
+
+
+def create_download_button(object_to_download, download_filename, button_text):
+  
+    if isinstance(object_to_download, pd.DataFrame):
+        object_to_download = object_to_download.to_csv(index=False)
+    
+    # Create a BytesIO buffer
+    b64 = base64.b64encode(object_to_download.encode()).decode()
+    
+    button_uuid = str(uuid.uuid4()).replace('-', '')
+    button_id = re.sub('\d+', '', button_uuid)
+
+    custom_css = f"""
+        <style>
+            #{button_id} {{
+                background-color: rgb(255, 255, 255);
+                color: rgb(38, 39, 48);
+                padding: 0.25em 0.38em;
+                position: relative;
+                text-decoration: none;
+                border-radius: 4px;
+                border-width: 1px;
+                border-style: solid;
+                border-color: rgb(230, 234, 241);
+                border-image: initial;
+            }}
+            #{button_id}:hover {{
+                border-color: rgb(246, 51, 102);
+                color: rgb(246, 51, 102);
+            }}
+            #{button_id}:active {{
+                box-shadow: none;
+                background-color: rgb(246, 51, 102);
+                color: white;
+                }}
+        </style> """
+
+    dl_link = custom_css + f'<a download="{download_filename}" id="{button_id}" href="data:file/txt;base64,{b64}">{button_text}</a><br></br>'
+    
+    return dl_link
+
+
+def display_report(data, translations):
+    st.title(_("Report Generation and Scheduling"))
+    
+    # Report Generation
+    st.header(_("Generate Report"))
+    report_type = st.selectbox(_("Select Report Type"), ["Full Report", "Summary Report", "Custom Report"])
+    
+    if st.button(_("Generate Report")):
+        report = generate_report(data, report_type)
+        st.text_area(_("Generated Report"), report, height=300)
+        st.markdown(export_csv(pd.DataFrame({'Report': [report]}), filename="social_media_report.csv", button_text=_("Download Report as CSV")), unsafe_allow_html=True)
+
+    # Report Scheduling
+    st.header(_("Schedule Automated Reports"))
+    
+    recipient_email = st.text_input(_("Enter recipient email address"))
+    sender_email = st.text_input(_("Enter your email address"))
+    sender_password = st.text_input(_("Enter your email password"), type="password")
+    email_provider = st.selectbox(_("Select your email provider"), list(EMAIL_PROVIDERS.keys()))
+    frequency = st.selectbox(_("Select report frequency"), ["Daily", "Weekly", "Monthly"])
+    
+    if st.button(_("Schedule Reports")):
+        if recipient_email and sender_email and sender_password and email_provider:
+            schedule_report(recipient_email, frequency, sender_email, sender_password, email_provider)
+            st.success(_("Reports scheduled to be sent {frequency} to {recipient_email}").format(frequency=frequency.lower(), recipient_email=recipient_email))
+        else:
+            st.error(_("Please fill in all fields"))
+
+    # Display scheduled reports
+    st.header(_("Scheduled Reports"))
+    if scheduled_reports:
+        for i, report in enumerate(scheduled_reports):
+            st.write(f"{i+1}. To: {report['email']}, Frequency: {report['frequency']}, Next Run: {report['next_run']}")
+    else:
+        st.write(_("No reports scheduled"))
+
+
+def generate_report(data, report_type):
+    if report_type == "Full Report":
+        report = "Full Social Media Analytics Report\n\n"
+        for column in data.columns:
+            report += f"{column}:\n"
+            for value in data[column]:
+                report += f"  {value}\n"
+            report += "\n"
+    elif report_type == "Summary Report":
+        report = "Summary Social Media Analytics Report\n\n"
+        for column in data.columns:
+            report += f"{column}: {data[column].mean():.2f} (average)\n"
+    else:  # Custom Report
+        report = "Custom Social Media Analytics Report\n\n"
+        # Add custom logic here based on your requirements
+    
+    return report
+
+# Global variables
+scheduled_reports = []
+
+# Email provider configurations
+EMAIL_PROVIDERS = {
+    'Gmail': {'smtp_server': 'smtp.gmail.com', 'smtp_port': 587},
+    'Outlook': {'smtp_server': 'smtp-mail.outlook.com', 'smtp_port': 587},
+    'Yahoo': {'smtp_server': 'smtp.mail.yahoo.com', 'smtp_port': 587},
+    # Add more providers as needed
+}
+
+def schedule_report(email, frequency, sender_email, sender_password, email_provider):
+    now = datetime.now()
+    if frequency == 'Daily':
+        next_run = now.replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    elif frequency == 'Weekly':
+        days_ahead = 7 - now.weekday()
+        next_run = now.replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(days=days_ahead)
+    elif frequency == 'Monthly':
+        if now.month == 12:
+            next_run = now.replace(year=now.year+1, month=1, day=1, hour=8, minute=0, second=0, microsecond=0)
+        else:
+            next_run = now.replace(month=now.month+1, day=1, hour=8, minute=0, second=0, microsecond=0)
+    
+    scheduled_reports.append({
+        'email': email,
+        'frequency': frequency,
+        'next_run': next_run,
+        'sender_email': sender_email,
+        'sender_password': sender_password,
+        'email_provider': email_provider
+    })
+
+def send_email(recipient, subject, body, sender_email, sender_password, email_provider):
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = recipient
+    msg['Subject'] = subject
+
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        server = smtplib.SMTP(EMAIL_PROVIDERS[email_provider]['smtp_server'], 
+                              EMAIL_PROVIDERS[email_provider]['smtp_port'])
+        server.starttls()
+        server.login(sender_email, sender_password)
+        text = msg.as_string()
+        server.sendmail(sender_email, recipient, text)
+        server.quit()
+        print(f"Email sent successfully to {recipient}")
+    except Exception as e:
+        print(f"Failed to send email: {str(e)}")
+
+def run_scheduler():
+    while True:
+        now = datetime.now()
+        for report in scheduled_reports:
+            if now >= report['next_run']:
+                send_scheduled_report(report['email'], report['sender_email'], 
+                                      report['sender_password'], report['email_provider'])
+                if report['frequency'] == 'Daily':
+                    report['next_run'] += timedelta(days=1)
+                elif report['frequency'] == 'Weekly':
+                    report['next_run'] += timedelta(days=7)
+                elif report['frequency'] == 'Monthly':
+                    if report['next_run'].month == 12:
+                        report['next_run'] = report['next_run'].replace(year=report['next_run'].year+1, month=1)
+                    else:
+                        report['next_run'] = report['next_run'].replace(month=report['next_run'].month+1)
+        time.sleep(60)  # Check every minute
+
+def send_scheduled_report(email, sender_email, sender_password, email_provider):
+    data = load_data()  # Your function to load the latest data
+    report = generate_report(data, "Full Report")  # Assuming you want to send a full report
+    send_email(email, "Your Scheduled Social Media Analytics Report", report, 
+               sender_email, sender_password, email_provider)
+
+# Start the scheduler in a separate thread
+scheduler_thread = threading.Thread(target=run_scheduler)
+scheduler_thread.start()
+
+def load_translations(lang):
+    translations = {
+        "dashboard_title": _("Dashboard"),
+        "overview": _("Overview"),
+        "platform_specific_title": _("Platform Specific"),
+        "platform_metrics": _("Platform Metrics"),
+        "gen_ai_title": _("Gen AI"),
+        "ai_insights": _("AI Insights"),
+        "sentiment_analysis_title": _("Sentiment Analysis"),
+        "sentiment_breakdown": _("Sentiment Breakdown"),
+        "world_view_title": _("World View"),
+        "global_reach": _("Global Reach"),
+        "live_updates_title": _("Digital Media Analytics Live Updates"),
+        "start_stop_button": _("Start/Stop Live Updates"),
+        "social_media_metrics": _("Social Media Metrics"),
+        "platform_performance": _("Platform Performance"),
+        "audience_insights": _("Audience Insights"),
+        "age_distribution_title": _("Age Group Distribution"),
+        "legend_title": _("Age Groups"),
+        "info_message": _("Click 'Start/Stop Live Updates' to begin"),
+        "download_csv": _("Download CSV"),
+        "download_chart": _("Download Chart"),
+        "export_data": _("Export Data"),
+        "export_chart": _("Export Chart"),
+        "report_generation_title": _("Report Generation and Scheduling"),
+        "generate_report": _("Generate Report"),
+        "select_report_type": _("Select Report Type"),
+        "download_report": _("Download Report as CSV"),
+        "schedule_reports": _("Schedule Automated Reports"),
+        "scheduled_reports": _("Scheduled Reports"),
+        "no_reports_scheduled": _("No reports scheduled"),
+        "mentions": _("Mentions"),
+        "unique_users": _("Unique Users"),
+        "engagement_rate": _("Engagement Rate"),
+        "sentiment_score": _("Sentiment Score"),
+        "total_users": _("Total Users"),
+    }
+    return translations
+
+
+
+def generate_report(data, report_type):
+    if report_type == "Full Report":
+        report = "Full Social Media Analytics Report\n\n"
+        for column in data.columns:
+            report += f"{column}:\n"
+            for value in data[column]:
+                report += f"  {value}\n"
+            report += "\n"
+    elif report_type == "Summary Report":
+        report = "Summary Social Media Analytics Report\n\n"
+        for column in data.columns:
+            report += f"{column}: {data[column].mean():.2f} (average)\n"
+    else:  # Custom Report
+        report = "Custom Social Media Analytics Report\n\n"
+       
+    
+    return report
+
+
+if __name__ == "__main__":
+    main()
