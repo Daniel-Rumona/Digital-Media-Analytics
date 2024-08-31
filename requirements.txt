@@ -12,3 +12,4 @@ google-cloud-translate==3.16.0
 python-dotenv==1.0.1
 kaleido==0.2.1
 smtplib==3.5.4
+google-ai-generativelanguage==0.6.5
