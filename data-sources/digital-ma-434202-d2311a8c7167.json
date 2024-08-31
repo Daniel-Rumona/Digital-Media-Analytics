@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "digital-ma-434202",
+  "private_key_id": "d2311a8c716767297820682c9e2b2b057c74c94e",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCh+/p/jcgPUovw\n3HMV3VokwOmvEgjYTUVwfWDLaGaB+j3DM/mA+ViCQcKQIrT/5g6q3S5g1f4wdW3v\nkkdUFzsQIxjrIHVvCaR6RxRtYRVwEP5mVzOxsZXh33iQ8yddEea5/jHc4snCs/Ic\n+UVr6kOJTB8Qz0lDpzstR0Opd/q7mXjUKTP+gq0YQZxO6Pr4qIoCeu8qrMBeFhm5\nDqkP1ZrgyNTDc81iWgV+FmJbuWP2e1e3GiRYzXar2c7RL2xr6SMuWQEFZt+SR2w3\nZ4WUqnGRmveDl44N6hA21g/HGKICwosWs4nDOM1hx/RgricMGFMGBnAb1tRVmS5J\ndPCf8pN/AgMBAAECggEABtWHuwvzTdowt0fFvz1oiTZuZYmAQAf6jwVrKQnNkVxK\ncMrnku5yMoStvcEJG+bL5Z+RTlqY79h0e/AS/FRClKq2aW0kJzwj6VjIXtkCu4is\nAwtYzf1tEmuIPa1UktOnhV9ZITWcR4+p/ljx+dyXXtqMUPw93hHXKFDiZOr/9Bwz\nTeuF6UkHdxryJl5kW2DLsnzvd4B6XKrqovWGl4Jc0fEulJPVwDIE7f5HB1gLOCsR\n6ckcotEO2L+oQRXD0D8ZJGhYS3RahWgyUH2kAFzGwspq+jG/rb+PvHtSpMW/GTzV\nBgOQKCqaTdQW19Niqe6qNTfxnCYggbovv0kiElqSCQKBgQDVoYErE64wlB4xKGra\n3FZE8C1NICWI4z5b1RdJzWr7Q6Ne4T4C6ZG7Vu/o8I5Jn72MeZkoxbhLsFrroLMr\nHGaSaZ1UjKaTw62GTlY6VZ6UFn4Mj+ZQkby9L8SKJbpudBkc2VECeE3+c/XVXIAk\nOGFdnUTTQW48l7ne70W1X8EblQKBgQDCHEQ+LAQZQGuE8+P+zQ2/0GqGId1tQj85\ngRHM+HHQkEbV6t/u8qWO8W5pV/8Sir9z8fOQpPrnmQe6qR9+UtnuO8Di1pK/AYyv\nIOaoqkgI2eeEZxRpUyOmiT0eS7CdYmmFraMjO3pF3KfuscHTTRB56RD5hebpansW\njaxf3qQNwwKBgQC53WEfVGkZ9NRr2olVT5xzMC+Jya0+cs+fYD95w5IPeCKcewXT\nzNkxEAt9NEXngmaM4ILDuXqFx7LjDJa1rGkFe4QZuqF3MCk6D8/vwuxMVWFnlo9A\ni/uU8gliVD7muHXc5qoXpwncl5FMB8WpPbBgnWLzFhtN9ogNkUmp6tx9HQKBgF4j\np1Ufs70raPnJ7sEcYZatVXxH4EOk5VTWK/Pkag5kanZEuuX/+BsjLBEbBDHR6Jgq\nt51m5eh8Zys36nYxaFAJ2roopnLMJZaptjQGoXjpdUbZVyTdlWSnGmUfAEDUAak7\nVOs5ZUuMgEVbIE2CCoOVbQ4Wyq5ZXejKPNch+x5RAoGBAIopWEo0Ph1aBRCUm6+A\nFwNa/PHoXi0yhX1OJblKufK73vur4A1vwhnS7RessZ3bFN1MTdc6Ia2ytbIcpHgk\n8OClhJbiwaVXYayAZbOJ4TusQswydJ3PVnE/f2zzQiu82+FQPlAosL5xtVYbX+9f\nZiKNaozRVJN7Oc6TeexlJFlM\n-----END PRIVATE KEY-----\n",
+  "client_email": "digital-ma-servicaaccount@digital-ma-434202.iam.gserviceaccount.com",
+  "client_id": "106457439161339265684",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/digital-ma-servicaaccount%40digital-ma-434202.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
