@@ -1343,7 +1343,7 @@ elif selected_index == 5:
         st.header(translations["generate_report"])
         report_type = st.selectbox(("Select Report Type"), ["Full Report", "Summary Report", "Custom Report"])
 
-        if st.button(translations["generate_report"]):
+        if st.button(translations["generate_report"], use_container_width=True):
             report = generate_report(data, report_type)
             st.text_area(("Generated Report"), report, height=300)
             # st.markdown(export_csv(pd.DataFrame({'Report': [report]}), filename="social_media_report.csv",
