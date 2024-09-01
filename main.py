@@ -964,7 +964,7 @@ elif selected_index == 3:
         month_name = st.selectbox(translations['select_target_month'], list(month_mapping.keys()))
     with chart_col:
         # Select the chart type
-        chart_type = st.selectbox(translations['select_chart_type'], ["sankey", "bar", "radar", 'word-cloud'])
+        chart_type = st.selectbox(translations['select_chart_type'], ["sankey", "bar", "radar"])
 
     if targets and month_name:
         # Get the corresponding month key from the mapping
@@ -1025,65 +1025,6 @@ elif selected_index == 3:
                 }
                 # Display the Sankey chart
                 stc.streamlit_highcharts(sankey_chart_data, height=600)
-            else:
-                st.warning(f"No data found for the selected topics in {month_name}")
-        elif chart_type == "word-cloud":
-            # Basic sentiment analysis function using TextBlob
-            def get_sentiment(text):
-                sid = SentimentIntensityAnalyzer()
-                scores = sid.polarity_scores(text)
-                if scores['compound'] >= 0.05:
-                    return "Positive"
-                elif scores['compound'] <= -0.05:
-                    return "Negative"
-                else:
-                    return "Neutral"
-
-
-            all_words = {'Positive': [], 'Negative': []}
-
-            for target in targets:
-                mentions = data.get(target, {}).get('mentions', [])
-                if mentions:
-                    # Filter mentions by the selected month
-                    month_mentions = [mention for mention in mentions if month in mention['date']]
-                if month_mentions:
-                    # Perform sentiment analysis
-                    for mention in month_mentions:
-                        sentiment = get_sentiment(mention['mention'])  # Assuming 'mention' field contains text
-                        words = mention['mention'].split()
-                        if sentiment == "Positive":
-                            all_words['Positive'].extend(words)
-                        elif sentiment == "Negative":
-                            all_words['Negative'].extend(words)
-            # Prepare data for the word cloud
-            wordcloud_data = [
-                                 {"name": word, "weight": 1, "color": "blue"} for word in all_words['Positive']
-                             ] + [
-                                 {"name": word, "weight": 1, "color": "red"} for word in all_words['Negative']
-                             ]
-            if wordcloud_data:
-                # Generate the Highcharts word cloud configuration
-                wordcloud_chart_data = f"""
-                    <script src="https://code.highcharts.com/highcharts.js"></script>
-                    <script src="https://code.highcharts.com/modules/wordcloud.js"></script>
-                    <div id="container"></div>
-                    <script>
-                    Highcharts.chart('container', {{
-                        chart: {{
-                            type: 'wordcloud',
-                            borderRadius: 15}},
-                        title: {{ text: 'Sentiment Analysis Word Cloud' }},
-                        series: [{{
-                            type: 'wordcloud',
-                            data: {wordcloud_data},
-                            name: 'Occurrences'
-                        }}]
-                    }});
-                    </script>
-                    """
-                # Display the word cloud using streamlit.components.v1
-                components.html(wordcloud_chart_data, height=650)
             else:
                 st.warning(f"No data found for the selected topics in {month_name}")
 
@@ -1212,8 +1153,12 @@ elif selected_index == 4:
             }},
 
             colorAxis: {{
-                min: 0
-            }},
+            min: 1,
+            max: 1000,
+            type: 'logarithmic',
+            minColor: '#4a0023',
+            maxColor: '#800020'
+        }},
 
             series: [{{
                 data: {json.dumps(mapped_data)},
@@ -1221,7 +1166,7 @@ elif selected_index == 4:
                 joinBy: 'hc-key',
                 states: {{
                     hover: {{
-                        color: '#a4edba'
+                        color: '#660033'
                     }}
                 }},
                 dataLabels: {{
@@ -1362,8 +1307,8 @@ elif selected_index == 5:
             },
             "colorAxis": {
                 "min": 0,
-                "minColor": "#E0F7FA",  # Light blue
-                "maxColor": "#006064"  # Dark blue
+                "minColor": "#E57373",  # Medium red
+                "maxColor": "#8B0000"  # Very dark red
             },
             "legend": {
                 "align": "center",
