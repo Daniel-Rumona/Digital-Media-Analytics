@@ -224,8 +224,10 @@ with st.sidebar:
         orientation="vertical",
 
     )
+# Determine the index of the selected option
+selected_index = options.index(options)
 
-if options[0]:
+if selected_index == 0:
     # Load the data
     data = load_data()
 
@@ -514,7 +516,7 @@ if options[0]:
                 # Add assistant response to chat history
                 st.session_state.messages.append({"role": "assistant", "content": response})
 
-elif options[1]:
+elif selected_index == 1:
     @st.cache_data
     def get_platform_groups():
         return {
@@ -908,7 +910,7 @@ elif options[1]:
             else:
                 st.warning(f"No data available for the selected parameters.")
 
-elif options[2]:
+elif selected_index == 2:
     @st.cache_data
     def load_data():
         with open("data-sources/Mentions-Data.json") as file:
@@ -943,7 +945,7 @@ elif options[2]:
         # Add assistant response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
 
-elif options[3]:
+elif selected_index == 3:
     data = load_data()
     target_col, month_col, chart_col = st.columns(3)
     # Multiselect for target entity
@@ -1124,7 +1126,7 @@ elif options[3]:
             else:
                 st.warning(f"No data found for the selected topics in {month_name}")
 
-elif options[4]:
+elif selected_index == 4:
     # Load the JSON data
     with open("data-sources/Mentions-Data.json", "r") as file:
         data = json.load(file)
@@ -1287,7 +1289,7 @@ elif options[4]:
                          )}
                      )
 
-elif options[5]:
+elif selected_index == 5:
     data = load_data()
 
 
