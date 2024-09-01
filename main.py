@@ -191,6 +191,9 @@ def load_translations(lang):
         "global_reach": _("Global Reach"),
         "live_updates_title": _("Digital Media Analytics Live Updates"),
         "start_stop_button": _("Update View"),
+        "select_target_topic": _("Select The Target Topic"),
+        "data_view": _("Data View"),
+        "gen_ai": _("Gen AI"),
         "current_social_engagements": _("Current Social Engagements"),
         "monthly_social_engagements_metrics": _("Monthly Social Engagements Metrics"),
         "social_media_metrics": _("Social Media Metrics"),
@@ -242,7 +245,7 @@ if options == "Dashboard":
     # Input for target entity
     target_col, month_col = st.columns(2)
     with target_col:
-        target = st.multiselect("Select The Target Topic", ['Mr Price', 'KZN Government', 'Edgars'], ["Mr Price"])
+        target = st.multiselect(translations["select_target_topic"], ['Mr Price', 'KZN Government', 'Edgars'], ["Mr Price"])
 
     with month_col:
         # Select the month by actual name
@@ -945,7 +948,7 @@ elif options == "Sentiment Analysis":
     target_col, month_col, chart_col = st.columns(3)
     # Multiselect for target entity
     with target_col:
-        targets = st.multiselect("Select The Target Topics", list(data.keys()))
+        targets = st.multiselect(translations["select_target_area"], list(data.keys()))
 
     # Mapping month names to keys
     month_mapping = {
@@ -1127,7 +1130,7 @@ elif options == "World View":
         data = json.load(file)
 
     # Select target (Mr Price or KZN Government)
-    target = st.selectbox("Select Target", list(data.keys()))
+    target = st.selectbox(translations["select_target_topic"], list(data.keys()))
 
     # Extract the mentions and their corresponding locations
     mentions_data = data[target]["mentions"]
