@@ -1358,7 +1358,7 @@ elif selected_index == 5:
         email_provider = st.selectbox(("Select your email provider"), list(EMAIL_PROVIDERS.keys()))
         frequency = st.selectbox(("Select report frequency"), ["Daily", "Weekly", "Monthly"])
 
-        if st.button(("Schedule Reports")):
+        if st.button(("Schedule Reports"), use_container_width=True):
             if recipient_email and sender_email and sender_password and email_provider:
                 schedule_report(recipient_email, frequency, sender_email, sender_password, email_provider)
                 st.success(
