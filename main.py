@@ -225,7 +225,7 @@ with st.sidebar:
 
     )
 
-if options == "Dashboard":
+if options[0]:
     # Load the data
     data = load_data()
 
@@ -514,7 +514,7 @@ if options == "Dashboard":
                 # Add assistant response to chat history
                 st.session_state.messages.append({"role": "assistant", "content": response})
 
-elif options == "Platform Specific":
+elif options[1]:
     @st.cache_data
     def get_platform_groups():
         return {
@@ -908,7 +908,7 @@ elif options == "Platform Specific":
             else:
                 st.warning(f"No data available for the selected parameters.")
 
-elif options == "Gen AI":
+elif options[2]:
     @st.cache_data
     def load_data():
         with open("data-sources/Mentions-Data.json") as file:
@@ -943,7 +943,7 @@ elif options == "Gen AI":
         # Add assistant response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
 
-elif options == "Sentiment Analysis":
+elif options[3]:
     data = load_data()
     target_col, month_col, chart_col = st.columns(3)
     # Multiselect for target entity
@@ -1124,7 +1124,7 @@ elif options == "Sentiment Analysis":
             else:
                 st.warning(f"No data found for the selected topics in {month_name}")
 
-elif options == "World View":
+elif options[4]:
     # Load the JSON data
     with open("data-sources/Mentions-Data.json", "r") as file:
         data = json.load(file)
@@ -1287,7 +1287,7 @@ elif options == "World View":
                          )}
                      )
 
-elif options == "Report":
+elif options[5]:
     data = load_data()
 
 
