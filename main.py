@@ -191,6 +191,7 @@ def load_translations(lang):
         "global_reach": _("Global Reach"),
         "live_updates_title": _("Digital Media Analytics Live Updates"),
         "start_stop_button": _("Update View"),
+        "current_social_engagements": _("Current Social Engagements"),
         "social_media_metrics": _("Social Media Metrics"),
         "platform_performance": _("Platform Performance"),
         "audience_insights": _("Audience Insights"),
@@ -351,12 +352,10 @@ if options == "Dashboard":
 
 
         def display_live_updates(data, translations):
-            if 'running' not in st.session_state:
-                st.session_state.running = False
 
             c1, c2 = st.columns(2)
             with c1:
-                st.header("Current Social Engagements")
+                st.header(translations["current_social_engagements"])
             with c2:
                 st.write("")
                 st.write("")
