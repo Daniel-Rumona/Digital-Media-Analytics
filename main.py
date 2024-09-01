@@ -193,6 +193,7 @@ def load_translations(lang):
         "download_csv": _("Download CSV"),
         "generate_report": _("Generate Report"),
         "select_time_period": _("Select Time Period"),
+        "select_chart_type": _("Select Chart Type"),
         "schedule_automated_reports": _("Schedule Automated Reports")
 
     }
@@ -963,7 +964,7 @@ elif selected_index == 3:
         month_name = st.selectbox(translations['select_target_month'], list(month_mapping.keys()))
     with chart_col:
         # Select the chart type
-        chart_type = st.selectbox("Select Chart Type", ["sankey", "bar", "radar", 'word-cloud'])
+        chart_type = st.selectbox(translations['select_chart_type'], ["sankey", "bar", "radar", 'word-cloud'])
 
     if targets and month_name:
         # Get the corresponding month key from the mapping
