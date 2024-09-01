@@ -371,7 +371,7 @@ if selected_index == 0:
             with c2:
                 st.write("")
                 st.write("")
-                start_stop = st.button(translations["start_stop_button"], disabled=True, use_container_width=True)
+                st.button(translations["start_stop_button"], disabled=True, use_container_width=True)
 
 
             st.markdown("""
@@ -450,14 +450,6 @@ if selected_index == 0:
                         # Display the pie chart
                         pie_chart = create_pie_chart(chart_data)
                         st.plotly_chart(pie_chart, use_container_width=True)
-
-                for date, updates in generate_live_updates(data, speed=1):
-                    if not st.session_state.running:
-                        break
-
-                    # Update metrics and charts here
-                    time.sleep(1)  # Update every second
-
 
         def create_pie_chart(data):
             fig = go.Figure(data=[go.Pie(labels=data['labels'], values=data['values'])])
