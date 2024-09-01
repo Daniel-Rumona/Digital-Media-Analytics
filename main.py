@@ -192,6 +192,7 @@ def load_translations(lang):
         "live_updates_title": _("Digital Media Analytics Live Updates"),
         "start_stop_button": _("Update View"),
         "current_social_engagements": _("Current Social Engagements"),
+        "monthly_social_engagements_metrics": _("Monthly Social Engagements Metrics"),
         "social_media_metrics": _("Social Media Metrics"),
         "platform_performance": _("Platform Performance"),
         "audience_insights": _("Audience Insights"),
