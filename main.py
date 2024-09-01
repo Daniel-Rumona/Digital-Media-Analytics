@@ -45,70 +45,6 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-
-def create_download_button(object_to_download, download_filename, button_text):
-    if isinstance(object_to_download, pd.DataFrame):
-        object_to_download = object_to_download.to_csv(index=False)
-
-    # Create a BytesIO buffer
-    b64 = base64.b64encode(object_to_download.encode()).decode()
-
-    button_uuid = str(uuid.uuid4()).replace('-', '')
-    button_id = re.sub('\d+', '', button_uuid)
-
-    custom_css = f"""
-        <style>
-            #{button_id} {{
-                background-color: rgb(255, 255, 255);
-                color: rgb(38, 39, 48);
-                padding: 0.25em 0.38em;
-                position: relative;
-                text-decoration: none;
-                border-radius: 4px;
-                border-width: 1px;
-                border-style: solid;
-                border-color: rgb(230, 234, 241);
-                border-image: initial;
-            }}
-            #{button_id}:hover {{
-                border-color: rgb(246, 51, 102);
-                color: rgb(246, 51, 102);
-            }}
-            #{button_id}:active {{
-                box-shadow: none;
-                background-color: rgb(246, 51, 102);
-                color: white;
-                }}
-        </style> """
-
-    dl_link = custom_css + f'<a download="{download_filename}" id="{button_id}" href="data:file/txt;base64,{b64}">{button_text}</a><br></br>'
-
-    return dl_link
-
-
-def export_csv(data, filename="social_media_data.csv", button_text="Download CSV File"):
-    """
-    Creates a download button for a pandas DataFrame as a CSV file.
-    """
-    csv = data.to_csv(index=False)
-    return create_download_button(csv, filename, button_text)
-
-
-def export_chart_as_png(fig, filename="chart.png", button_text="Download Chart as PNG"):
-    """
-    Creates a download button for a plotly figure as a PNG image.
-    If kaleido is not installed, provides a message to install it.
-    """
-    try:
-        img = pio.to_image(fig, format="png")
-        return create_download_button(img, filename, button_text)
-    except ValueError as e:
-        if "kaleido" in str(e):
-            return "To enable chart downloads, please install the kaleido package: `pip install -U kaleido`"
-        else:
-            raise e
-
-
 load_dotenv()
 # Configure the Google Generative AI API
 genai.configure(
@@ -135,9 +71,9 @@ st.title(':red[Social] Media :red[Analytics]')
 with st.sidebar:
     options = option_menu(
         menu_title="Main Menu",
-        options=["Dashboard", "Platform Specific", "Gen AI", "Sentiment Analysis", "World View", "Live Updates",
+        options=["Dashboard", "Platform Specific", "Gen AI", "Sentiment Analysis", "World View",
                  "Report"],
-        icons=["exclude", "slack", "chat-quote", "emoji-smile", 'globe', 'graph-up', 'file-earmark-text'],
+        icons=["exclude", "slack", "chat-quote", "emoji-smile", 'globe', 'file-earmark-text'],
         menu_icon="cast",
         default_index=0,
         orientation="vertical",
@@ -186,6 +122,26 @@ def perform_sentiment_analysis(mentions):
     return sentiments
 
 
+# Get the path to your JSON file
+json_file_path = os.path.join(os.getcwd(), "data-sources", "digital-ma-434202-d2311a8c7167.json")
+
+try:
+    # Load credentials
+    credentials = service_account.Credentials.from_service_account_file(
+        json_file_path,
+        scopes=['https://www.googleapis.com/auth/cloud-platform']
+    )
+
+    # Initialize the translation client with the credentials
+    client = translate.Client(credentials=credentials)
+
+except FileNotFoundError:
+    st.error(f"Service account JSON file not found at {json_file_path}. Please check the file path.")
+    st.stop()
+except Exception as e:
+    st.error(f"An error occurred while setting up the Google Cloud client: {str(e)}")
+    st.stop()
+
 # Define available languages
 LANGUAGES = {
     'English': 'en',
@@ -206,47 +162,58 @@ LANGUAGES = {
 }
 
 
+def translate_text(text, target_language):
+    try:
+        result = client.translate(text, target_language=target_language)
+        return result['translatedText']
+    except Exception as e:
+        st.error(f"Translation error: {str(e)}")
+        return text
+
+
+def _(message):
+    if st.session_state.lang != 'en':
+        return translate_text(message, st.session_state.lang)
+    return message
+
+
 def load_translations(lang):
     translations = {
-        "dashboard_title": ("Dashboard"),
-        "overview": ("Overview"),
-        "platform_specific_title": ("Platform Specific"),
-        "platform_metrics": ("Platform Metrics"),
-        "gen_ai_title": ("Gen AI"),
-        "ai_insights": ("AI Insights"),
-        "sentiment_analysis_title": ("Sentiment Analysis"),
-        "sentiment_breakdown": ("Sentiment Breakdown"),
-        "world_view_title": ("World View"),
-        "global_reach": ("Global Reach"),
-        "live_updates_title": ("Digital Media Analytics Live Updates"),
-        "start_stop_button": ("Start/Stop Live Updates"),
-        "social_media_metrics": ("Social Media Metrics"),
-        "platform_performance": ("Platform Performance"),
-        "audience_insights": ("Audience Insights"),
-        "age_distribution_title": ("Age Group Distribution"),
-        "legend_title": ("Age Groups"),
-        "info_message": ("Click 'Start/Stop Live Updates' to begin"),
-        "download_csv": ("Download CSV"),
-        "download_chart": ("Download Chart"),
-        "export_data": ("Export Data"),
-        "export_chart": ("Export Chart"),
+        "dashboard_title": _("Dashboard"),
+        "overview": _("Overview"),
+        "platform_specific_title": _("Platform Specific"),
+        "platform_metrics": _("Platform Metrics"),
+        "gen_ai_title": _("Gen AI"),
+        "ai_insights": _("AI Insights"),
+        "sentiment_analysis_title": _("Sentiment Analysis"),
+        "sentiment_breakdown": _("Sentiment Breakdown"),
+        "world_view_title": _("World View"),
+        "global_reach": _("Global Reach"),
+        "live_updates_title": _("Digital Media Analytics Live Updates"),
+        "start_stop_button": _("Update View"),
+        "social_media_metrics": _("Social Media Metrics"),
+        "platform_performance": _("Platform Performance"),
+        "audience_insights": _("Audience Insights"),
+        "age_distribution_title": _("Age Group Distribution"),
+        "legend_title": _("Age Groups"),
+        "download_csv": _("Download CSV"),
+        "download_chart": _("Download Chart"),
+        "export_data": _("Export Data"),
+        "export_chart": _("Export Chart"),
 
     }
     return translations
 
-
-# Initialize session state if it doesn't exist
 if 'lang' not in st.session_state:
-    st.session_state.lang = LANGUAGES["English"]  # Default language
+    st.session_state.lang = 'en'
 
 # Add language selection to the sidebar
-st.sidebar.title("Language Settings")
+st.sidebar.title(_("Language Settings"))
 selected_language = st.sidebar.selectbox(
-    "Select your preferred language",
-    options=list(LANGUAGES.keys()),
-    index=list(LANGUAGES.values()).index(st.session_state.lang)
+        _("Select your preferred language"),
+        options=list(LANGUAGES.keys()),
+        index=list(LANGUAGES.values()).index(st.session_state.lang)
 )
-
 # Update the session state with the selected language
 st.session_state.lang = LANGUAGES[selected_language]
 
@@ -310,6 +277,7 @@ if options == "Dashboard":
         # Count mentions for the selected and previous months across all targets
         mentions_current_month = count_mentions(data, target, month_name)
         mentions_previous_month = count_mentions(data, target, previous_month) if previous_month else {}
+        st.header("Monthly Social Engagements Metrics")
 
         style_metric_cards(
             background_color="#00000000",  # Set the desired background color
@@ -333,7 +301,170 @@ if options == "Dashboard":
                     st.metric(label=f"{platform}", value=current_value, delta=difference)
         else:
             st.warning("No data available for the selected company in the specified months.")
+        style_metric_cards(
+            background_color="#00000000",  # Set the desired background color
+            border_radius_px=10,  # Set border radius
+            border_left_color="deepskyblue",
+            border_color="deepskyblue"  # Set the border color
+        )
 
+
+        def load_live_data():
+            # Replace this with your actual data loading logic
+            df = pd.DataFrame({
+                'date': ['2023-01-01', '2023-01-02', '2023-01-03'],
+                'mentions': [100, 200, 300],
+                'unique_users': [80, 90, 95],
+                'engagement_rate': [60, 62, 64],
+                'sentiment_score': [0.7, 0.75, 0.8],
+                'total_users': [800, 820, 840],
+                'age_group_1824': [20, 22, 24],
+                'age_group_2530': [45, 47, 49],
+                'age_group_4055': [15, 17, 19],
+                'age_group_5565plus': [10, 12, 14]
+            })
+            return df
+
+
+        def generate_live_updates(data, speed=1):
+            """
+            Generator function to provide live updates.
+            :param data: The loaded DataFrame
+            :param speed: Speed multiplier for updates (default is 1)
+            """
+            data['date'] = pd.to_datetime(data['date'])  # Ensure dates are in datetime format
+            sorted_data = data.sort_values(by='date')
+
+            start_date = sorted_data['date'].min()
+            end_date = sorted_data['date'].max()
+
+            current_date = start_date
+
+            while current_date <= end_date:
+                # Get all mentions for the current date
+                current_mentions = sorted_data[sorted_data['date'] <= current_date]
+
+                yield current_date, current_mentions
+
+                current_date += timedelta(days=1)
+                time.sleep(1 / speed)  # Adjust speed of updates
+
+
+        def display_live_updates(data, translations):
+            if 'running' not in st.session_state:
+                st.session_state.running = False
+
+            c1, c2 = st.columns(2)
+            with c1:
+                st.header("Current Social Engagements")
+            with c2:
+                st.write("")
+                st.write("")
+                start_stop = st.button(translations["start_stop_button"], disabled=True, use_container_width=True)
+
+
+            st.markdown("""
+                <style>
+                .container {padding-top: 2rem;}
+                .row {display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem;}
+                .col {flex-basis: calc(50% - 1rem); margin-right: 1rem;}
+                </style>
+                """, unsafe_allow_html=True)
+
+            container = st.container()
+
+            with container:
+                row1 = st.container()
+                row2 = st.container()
+                row3 = st.container()
+
+                # Social Media Metrics
+                with row1:
+                    st.subheader(translations["social_media_metrics"])
+
+                    # Create a list of metrics with their corresponding labels, values, and deltas
+                    metrics = [
+                            (("Mentions"), f"{data['mentions'].iloc[-1]:,}",
+                             f"{data['mentions'].pct_change().iloc[-1] * 100:.2f}%"),
+                            (("Unique Users"), f"{data['unique_users'].iloc[-1]:,}",
+                             f"{data['unique_users'].pct_change().iloc[-1] * 100:.2f}%"),
+                            (("Engagement Rate"), f"{data['engagement_rate'].iloc[-1]:.2f}%",
+                             f"+{data['engagement_rate'].pct_change().iloc[-1] * 100:.2f}%"),
+                            (("Sentiment Score"), f"{data['sentiment_score'].iloc[-1]:.4f}",
+                             f"+{data['sentiment_score'].pct_change().iloc[-1] * 100:.2f}%"),
+                            (("Total Users"), f"{data['total_users'].iloc[-1]:,}",
+                             f"+{data['total_users'].pct_change().iloc[-1] * 100:.2f}%")
+                        ]
+
+                    # Create columns for the metrics
+                    cols = st.columns(len(metrics))
+
+                    # Display each metric in its own column
+                    for col, (metric, value, delta) in zip(cols, metrics):
+                        col.metric(metric, value, delta)
+                # Platform Performance
+                with row2:
+                        st.subheader(translations["platform_performance"])
+                        # List of platforms
+                        platforms = ['Facebook', 'Instagram', 'Twitter', 'LinkedIn', 'YouTube']
+
+                        # Create columns for each platform
+                        cols = st.columns(len(platforms))
+
+                        # Display each platform's metric in its own column
+                        for col, platform in zip(cols, platforms):
+                            col.metric(platform, f"{random.randint(500, 1500):,}", f"+{random.uniform(-5, 5):.2f}%")
+
+                # Audience Insights
+                with row3:
+                        st.subheader(translations["audience_insights"])
+                        total_users = data['total_users'].iloc[-1]
+                        age_groups = {
+                            ("18 - 24 years"): data['age_group_1824'].iloc[-1],
+                            ("25 - 40 years"): data['age_group_2530'].iloc[-1],
+                            ("40 - 55 years"): data['age_group_4055'].iloc[-1],
+                            ("55+ years"): data['age_group_5565plus'].iloc[-1]
+                        }
+
+                        # Create a pie chart for age groups
+                        chart_data = {
+                            "labels": list(age_groups.keys()),
+                            "values": list(age_groups.values()),
+                            "colors": ["#FFD700", "#32CD32", "#FF8C00", "#4169E1"],
+                            "title": translations["age_distribution_title"],
+                            "showlegend": True,
+                            "legend_title": translations["legend_title"]
+                        }
+
+                        # Display the pie chart
+                        pie_chart = create_pie_chart(chart_data)
+                        st.plotly_chart(pie_chart, use_container_width=True)
+
+                for date, updates in generate_live_updates(data, speed=1):
+                    if not st.session_state.running:
+                        break
+
+                    # Update metrics and charts here
+                    time.sleep(1)  # Update every second
+
+
+        def create_pie_chart(data):
+            fig = go.Figure(data=[go.Pie(labels=data['labels'], values=data['values'])])
+            fig.update_layout(title=data['title'])
+            fig.update_traces(hole=.3)
+            fig.update_layout(legend=dict(yanchor="top", y=0.99, xanchor="right", x=1.05))
+            return fig
+
+
+        # Load data
+        live_data = load_live_data()
+        # Define a dictionary to map option names to corresponding functions
+        display_functions = {
+            ("Live Updates"): display_live_updates,
+        }
+
+        # Call the appropriate function based on the selected option
+        display_functions["Live Updates"](live_data, translations)
         graph_col, genai_col = st.columns([4, 2])
         with graph_col:
             st.header("Data View")
@@ -381,13 +512,6 @@ if options == "Dashboard":
                 st.session_state.messages.append({"role": "assistant", "content": response})
 
 elif options == "Platform Specific":
-    @st.cache_data
-    def load_data():
-        with open("data-sources/Mentions-Data.json") as file:
-            data = json.load(file)
-        return data
-
-
     @st.cache_data
     def get_platform_groups():
         return {
@@ -996,6 +1120,7 @@ elif options == "Sentiment Analysis":
 
             else:
                 st.warning(f"No data found for the selected topics in {month_name}")
+
 elif options == "World View":
     # Load the JSON data
     with open("data-sources/Mentions-Data.json", "r") as file:
@@ -1158,189 +1283,7 @@ elif options == "World View":
                              max_value=max(df_top_locations.Mentions),
                          )}
                      )
-elif options == "Live Updates":
-    style_metric_cards(
-        background_color="#00000000",  # Set the desired background color
-        border_radius_px=10,  # Set border radius
-        border_left_color="deepskyblue",
-        border_color="deepskyblue"  # Set the border color
-    )
 
-
-    def load_data():
-        # Replace this with your actual data loading logic
-        df = pd.DataFrame({
-            'date': ['2023-01-01', '2023-01-02', '2023-01-03'],
-            'mentions': [100, 200, 300],
-            'unique_users': [80, 90, 95],
-            'engagement_rate': [60, 62, 64],
-            'sentiment_score': [0.7, 0.75, 0.8],
-            'total_users': [800, 820, 840],
-            'age_group_1824': [20, 22, 24],
-            'age_group_2530': [45, 47, 49],
-            'age_group_4055': [15, 17, 19],
-            'age_group_5565plus': [10, 12, 14]
-        })
-        return df
-
-
-    def generate_live_updates(data, speed=1):
-        """
-        Generator function to provide live updates.
-        :param data: The loaded DataFrame
-        :param speed: Speed multiplier for updates (default is 1)
-        """
-        data['date'] = pd.to_datetime(data['date'])  # Ensure dates are in datetime format
-        sorted_data = data.sort_values(by='date')
-
-        start_date = sorted_data['date'].min()
-        end_date = sorted_data['date'].max()
-
-        current_date = start_date
-
-        while current_date <= end_date:
-            # Get all mentions for the current date
-            current_mentions = sorted_data[sorted_data['date'] <= current_date]
-
-            yield current_date, current_mentions
-
-            current_date += timedelta(days=1)
-            time.sleep(1 / speed)  # Adjust speed of updates
-
-
-    def display_live_updates(data, translations):
-        st.title(translations["live_updates_title"])
-
-        if 'running' not in st.session_state:
-            st.session_state.running = False
-
-        start_stop = st.button(translations["start_stop_button"])
-        if start_stop:
-            st.session_state.running = not st.session_state.running
-
-        if st.session_state.running:
-            st.markdown("""
-            <style>
-            .container {padding-top: 2rem;}
-            .row {display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem;}
-            .col {flex-basis: calc(50% - 1rem); margin-right: 1rem;}
-            </style>
-            """, unsafe_allow_html=True)
-
-            container = st.container()
-
-            with container:
-                row1 = st.container()
-                row2 = st.container()
-                row3 = st.container()
-
-                # Social Media Metrics
-                with row1:
-                    st.subheader(translations["social_media_metrics"])
-
-                    # Create a list of metrics with their corresponding labels, values, and deltas
-                    metrics = [
-                        (("Mentions"), f"{data['mentions'].iloc[-1]:,}",
-                         f"{data['mentions'].pct_change().iloc[-1] * 100:.2f}%"),
-                        (("Unique Users"), f"{data['unique_users'].iloc[-1]:,}",
-                         f"{data['unique_users'].pct_change().iloc[-1] * 100:.2f}%"),
-                        (("Engagement Rate"), f"{data['engagement_rate'].iloc[-1]:.2f}%",
-                         f"+{data['engagement_rate'].pct_change().iloc[-1] * 100:.2f}%"),
-                        (("Sentiment Score"), f"{data['sentiment_score'].iloc[-1]:.4f}",
-                         f"+{data['sentiment_score'].pct_change().iloc[-1] * 100:.2f}%"),
-                        (("Total Users"), f"{data['total_users'].iloc[-1]:,}",
-                         f"+{data['total_users'].pct_change().iloc[-1] * 100:.2f}%")
-                    ]
-
-                    # Create columns for the metrics
-                    cols = st.columns(len(metrics))
-
-                    # Display each metric in its own column
-                    for col, (metric, value, delta) in zip(cols, metrics):
-                        col.metric(metric, value, delta)
-
-                # Platform Performance
-                with row2:
-                    st.subheader(translations["platform_performance"])
-                    # List of platforms
-                    platforms = ['Facebook', 'Instagram', 'Twitter', 'LinkedIn', 'YouTube']
-
-                    # Create columns for each platform
-                    cols = st.columns(len(platforms))
-
-                    # Display each platform's metric in its own column
-                    for col, platform in zip(cols, platforms):
-                        col.metric(platform, f"{random.randint(500, 1500):,}", f"+{random.uniform(-5, 5):.2f}%")
-
-                # Audience Insights
-                with row3:
-                    st.subheader(translations["audience_insights"])
-                    total_users = data['total_users'].iloc[-1]
-                    age_groups = {
-                        ("18 - 24 years"): data['age_group_1824'].iloc[-1],
-                        ("25 - 40 years"): data['age_group_2530'].iloc[-1],
-                        ("40 - 55 years"): data['age_group_4055'].iloc[-1],
-                        ("55+ years"): data['age_group_5565plus'].iloc[-1]
-                    }
-
-                    # Create a pie chart for age groups
-                    chart_data = {
-                        "labels": list(age_groups.keys()),
-                        "values": list(age_groups.values()),
-                        "colors": ["#FFD700", "#32CD32", "#FF8C00", "#4169E1"],
-                        "title": translations["age_distribution_title"],
-                        "showlegend": True,
-                        "legend_title": translations["legend_title"]
-                    }
-
-                    # Display the pie chart
-                    pie_chart = create_pie_chart(chart_data)
-                    st.plotly_chart(pie_chart, use_container_width=True)
-
-                # Add export options
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown(export_csv(data), unsafe_allow_html=True)
-                with col2:
-                    export_result = export_chart_as_png(pie_chart)
-                    if isinstance(export_result, str) and "kaleido" in export_result:
-                        st.warning(export_result)
-                    else:
-                        st.markdown(export_result, unsafe_allow_html=True)
-
-            for date, updates in generate_live_updates(data, speed=1):
-                if not st.session_state.running:
-                    break
-
-                # Update metrics and charts here
-                time.sleep(1)  # Update every second
-        else:
-            st.info(translations["info_message"])
-
-
-    def create_pie_chart(data):
-        fig = go.Figure(data=[go.Pie(labels=data['labels'], values=data['values'])])
-        fig.update_layout(title=data['title'])
-        fig.update_traces(hole=.3)
-        fig.update_layout(legend=dict(yanchor="top", y=0.99, xanchor="right", x=1.05))
-        return fig
-
-
-    # Load data
-    data = load_data()
-    # Define a dictionary to map option names to corresponding functions
-    display_functions = {
-        ("Live Updates"): display_live_updates,
-    }
-
-    # Get selected option
-    options = st.selectbox(
-        ("Select a module:"),
-        options=list(display_functions.keys())
-    )
-
-    # Call the appropriate function based on the selected option
-    display_functions[options](data, translations)
 elif options == "Report":
     data = load_data()
 
@@ -1452,8 +1395,8 @@ elif options == "Report":
         if st.button(("Generate Report")):
             report = generate_report(data, report_type)
             st.text_area(("Generated Report"), report, height=300)
-            st.markdown(export_csv(pd.DataFrame({'Report': [report]}), filename="social_media_report.csv",
-                                   button_text=("Download Report as CSV")), unsafe_allow_html=True)
+            # st.markdown(export_csv(pd.DataFrame({'Report': [report]}), filename="social_media_report.csv",
+            #                        button_text=("Download Report as CSV")), unsafe_allow_html=True)
 
         # Report Scheduling
         st.header(("Schedule Automated Reports"))
@@ -1602,32 +1545,3 @@ elif options == "Report":
     # Start the scheduler in a separate thread
     scheduler_thread = threading.Thread(target=run_scheduler)
     scheduler_thread.start()
-
-json_file_path = os.path.join(os.getcwd(), "data-sources", "digital-ma-434202-d2311a8c7167.json")
-
-try:
-    # Load credentials
-    credentials = service_account.Credentials.from_service_account_file(
-        json_file_path,
-        scopes=['https://www.googleapis.com/auth/cloud-platform']
-    )
-
-    # Initialize the translation client with the credentials
-    client = translate.Client(credentials=credentials)
-
-except FileNotFoundError:
-    st.error(f"Service account JSON file not found at {json_file_path}. Please check the file path.")
-    st.stop()
-except Exception as e:
-    st.error(f"An error occurred while setting up the Google Cloud client: {str(e)}")
-    st.stop()
-
-
-def translate_text(text, target_language):
-    try:
-        result = client.translate(text, target_language=target_language)
-        return result['translatedText']
-    except Exception as e:
-        st.error(f"Translation error: {str(e)}")
-        return text
-
