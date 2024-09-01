@@ -187,6 +187,7 @@ def load_translations(lang):
         "social_media_metrics": _("Social Media Metrics"),
         "platform_performance": _("Platform Performance"),
         "audience_insights": _("Audience Insights"),
+        'data_view': _("Data View"),
         "age_distribution_title": _("Age Group Distribution"),
         "legend_title": _("Age Groups"),
         "download_csv": _("Download CSV"),
@@ -470,7 +471,7 @@ if selected_index == 0:
         display_functions["Live Updates"](live_data, translations)
         graph_col, genai_col = st.columns([4, 2])
         with graph_col:
-            st.header("Data View")
+            st.header(translations['data_view'])
             if target and month_name:
                 all_mentions = []
                 # Filter the mentions based on the input
