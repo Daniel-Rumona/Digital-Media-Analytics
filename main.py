@@ -192,6 +192,7 @@ def load_translations(lang):
         "legend_title": _("Age Groups"),
         "download_csv": _("Download CSV"),
         "generate_report": _("Generate Report"),
+        "select_time_period": _("Select Time Period"),
         "schedule_automated_reports": _("Schedule Automated Reports")
 
     }
@@ -608,10 +609,11 @@ elif selected_index == 1:
 
     company_col, time_col = st.columns(2)
     with company_col:
-        company_choice = st.selectbox("Choose the company", ["Mr Price", "KZN Government", "Edgars"])
+        # company_choice = st.selectbox("Choose the company", ["Mr Price", "KZN Government", "Edgars"])
+        company_choice = st.selectbox(translations['select_target_topic'], ["Mr Price", "KZN Government", "Edgars"])
     # Select the time period for the trend analysis
     with time_col:
-        time_period = st.selectbox("Select Time Period", ["Yearly", "Monthly", "Weekly", "Daily"])
+        time_period = st.selectbox(translations['select_time_period'], ["Yearly", "Monthly", "Weekly", "Daily"])
 
     if st.session_state.selected_platform_group:
         if st.session_state.selected_platform == "All":
