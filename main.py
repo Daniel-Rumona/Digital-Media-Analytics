@@ -67,18 +67,6 @@ def respond(user_input, instruction=""):
 # Title of the app
 st.title(':red[Social] Media :red[Analytics]')
 
-# Option menu for navigation
-with st.sidebar:
-    options = option_menu(
-        menu_title="Main Menu",
-        options=["Dashboard", "Platform Specific", "Gen AI", "Sentiment Analysis", "World View",
-                 "Report"],
-        icons=["exclude", "slack", "chat-quote", "emoji-smile", 'globe', 'file-earmark-text'],
-        menu_icon="cast",
-        default_index=0,
-        orientation="vertical",
-
-    )
 
 
 @st.cache_data
@@ -183,15 +171,15 @@ def load_translations(lang):
         "overview": _("Overview"),
         "platform_specific_title": _("Platform Specific"),
         "platform_metrics": _("Platform Metrics"),
-        "gen_ai_title": _("Gen AI"),
         "ai_insights": _("AI Insights"),
         "sentiment_analysis_title": _("Sentiment Analysis"),
+        "report_title": _("Report"),
         "sentiment_breakdown": _("Sentiment Breakdown"),
         "world_view_title": _("World View"),
-        "global_reach": _("Global Reach"),
         "live_updates_title": _("Digital Media Analytics Live Updates"),
         "start_stop_button": _("Update View"),
         "select_target_topic": _("Select The Target Topic"),
+        "select_target_month": _("Select The Month"),
         "data_view": _("Data View"),
         "gen_ai": _("Gen AI"),
         "current_social_engagements": _("Current Social Engagements"),
@@ -224,6 +212,18 @@ st.session_state.lang = LANGUAGES[selected_language]
 
 # Load translations
 translations = load_translations(st.session_state.lang)
+# Option menu for navigation
+with st.sidebar:
+    options = option_menu(
+        menu_title="Main Menu",
+        options=[translations['dashboard_title'], translations['platform_metrics'], translations['gen_ai'], translations['sentiment_analysis_title'], translations['world_view_title'],
+                 translations['report_title']],
+        icons=["exclude", "slack", "chat-quote", "emoji-smile", 'globe', 'file-earmark-text'],
+        menu_icon="cast",
+        default_index=0,
+        orientation="vertical",
+
+    )
 
 if options == "Dashboard":
     # Load the data
@@ -249,7 +249,7 @@ if options == "Dashboard":
 
     with month_col:
         # Select the month by actual name
-        month_name_display = st.selectbox("Select the month", list(month_name_mapping.values()))
+        month_name_display = st.selectbox(translations['select_target_month'], list(month_name_mapping.values()))
 
     # Get the selected month in original format
     month_name = name_to_date_mapping[month_name_display]
@@ -282,7 +282,7 @@ if options == "Dashboard":
         # Count mentions for the selected and previous months across all targets
         mentions_current_month = count_mentions(data, target, month_name)
         mentions_previous_month = count_mentions(data, target, previous_month) if previous_month else {}
-        st.header("Monthly Social Engagements Metrics")
+        st.header(translations['monthly_social_engagements_metrics'])
 
         style_metric_cards(
             background_color="#00000000",  # Set the desired background color
@@ -485,7 +485,7 @@ if options == "Dashboard":
                 else:
                     st.warning(f"No data found for {', '.join(target)} in {month_name_display}")
         with genai_col:
-            st.header("Gen AI")
+            st.header(translations['gen_ai'])
             # Initialize chat history
             if "messages" not in st.session_state:
                 st.session_state.messages = []
@@ -957,7 +957,7 @@ elif options == "Sentiment Analysis":
     }
     with month_col:
         # Select the month by actual name
-        month_name = st.selectbox("Select the month", list(month_mapping.keys()))
+        month_name = st.selectbox(translations['select_target_month'], list(month_mapping.keys()))
     with chart_col:
         # Select the chart type
         chart_type = st.selectbox("Select Chart Type", ["sankey", "bar", "radar", 'word-cloud'])
