@@ -213,20 +213,27 @@ st.session_state.lang = LANGUAGES[selected_language]
 # Load translations
 translations = load_translations(st.session_state.lang)
 # Option menu for navigation
+options = [
+    translations['dashboard_title'],
+    translations['platform_metrics'],
+    translations['gen_ai'],
+    translations['sentiment_analysis_title'],
+    translations['world_view_title'],
+    translations['report_title']
+]
 with st.sidebar:
-    options = option_menu(
+    # Create the menu
+    selected_option = option_menu(
         menu_title="Main Menu",
-        options=[translations['dashboard_title'], translations['platform_metrics'], translations['gen_ai'], translations['sentiment_analysis_title'], translations['world_view_title'],
-                 translations['report_title']],
+        options=options,
         icons=["exclude", "slack", "chat-quote", "emoji-smile", 'globe', 'file-earmark-text'],
         menu_icon="cast",
         default_index=0,
         orientation="vertical",
-
     )
-# Determine the index of the selected option
-selected_index = options.index(options)
 
+# Determine the index of the selected option
+selected_index = options.index(selected_option)
 if selected_index == 0:
     # Load the data
     data = load_data()
@@ -950,7 +957,7 @@ elif selected_index == 3:
     target_col, month_col, chart_col = st.columns(3)
     # Multiselect for target entity
     with target_col:
-        targets = st.multiselect(translations["select_target_area"], list(data.keys()))
+        targets = st.multiselect(translations["select_target_topic"], list(data.keys()))
 
     # Mapping month names to keys
     month_mapping = {
