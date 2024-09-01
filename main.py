@@ -190,9 +190,8 @@ def load_translations(lang):
         "age_distribution_title": _("Age Group Distribution"),
         "legend_title": _("Age Groups"),
         "download_csv": _("Download CSV"),
-        "download_chart": _("Download Chart"),
-        "export_data": _("Export Data"),
-        "export_chart": _("Export Chart"),
+        "generate_report": _("Generate Report"),
+        "schedule_automated_reports": _("Schedule Automated Reports")
 
     }
     return translations
@@ -1398,20 +1397,19 @@ elif selected_index == 5:
 
 
     def display_report(data, translations):
-        st.title(("Report Generation and Scheduling"))
 
         # Report Generation
-        st.header(("Generate Report"))
+        st.header(translations["generate_report"])
         report_type = st.selectbox(("Select Report Type"), ["Full Report", "Summary Report", "Custom Report"])
 
-        if st.button(("Generate Report")):
+        if st.button(translations["generate_report"]):
             report = generate_report(data, report_type)
             st.text_area(("Generated Report"), report, height=300)
             # st.markdown(export_csv(pd.DataFrame({'Report': [report]}), filename="social_media_report.csv",
             #                        button_text=("Download Report as CSV")), unsafe_allow_html=True)
 
         # Report Scheduling
-        st.header(("Schedule Automated Reports"))
+        st.header(translations["schedule_automated_reports"])
 
         recipient_email = st.text_input(("Enter recipient email address"))
         sender_email = st.text_input(("Enter your email address"))
