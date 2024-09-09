@@ -9,7 +9,7 @@ import streamlit_highcharts as stc
 from streamlit_option_menu import option_menu
 from streamlit_extras.grid import grid
 from streamlit_extras.metric_cards import style_metric_cards
-from streamlit_date_picker import date_range_picker, date_picker, PickerType
+
 # Set page config at the very beginning
 st.set_page_config(page_title='Social Media Analytics', page_icon='💹', layout="wide")
 
