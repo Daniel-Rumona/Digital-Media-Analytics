@@ -1,5 +1,5 @@
 import sys
-
+from datetime import date, timedelta, datetime
 sys.path.append(r'C:\Users\admin\AppData\Local\Programs\Python\Python312\Lib\site-packages')
 
 # Streamlit related imports
@@ -14,8 +14,6 @@ from streamlit_extras.metric_cards import style_metric_cards
 st.set_page_config(page_title='Social Media Analytics', page_icon='💹', layout="wide")
 
 # All other imports
-import nltk
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import json
 import pandas as pd
 import plotly.graph_objects as go
@@ -23,45 +21,89 @@ from textblob import TextBlob
 import numpy as np
 import os
 from collections import defaultdict
-import google.generativeai as genai
-from dotenv import load_dotenv
-import re
 from collections import Counter
 import calendar
 import random
 import google.cloud.translate_v2 as translate
 from google.oauth2 import service_account
-
-import base64
-from io import BytesIO
-import plotly.io as pio
-
-import uuid
-import kaleido
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import threading
 import time
 from datetime import datetime, timedelta
+from openai import OpenAI
+import plotly.express as px
 
-load_dotenv()
-# Configure the Google Generative AI API
-genai.configure(
-    api_key=os.environ['API_KEY']
-)
+# Configuration
+OPENAI_API_KEY = "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"
+ASSISTANT_ID = "asst_pBfV7Ge7djC1F5nRxRRDlzXD"
 
-# Initialize chat
-model = genai.GenerativeModel(
-    "gemini-1.5-pro-latest"
-)
-chat = model.start_chat()
+# Initialize OpenAI client
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+
+def get_or_create_thread():
+    if 'thread_id' not in st.session_state:
+        thread = client.beta.threads.create()
+        st.session_state.thread_id = thread.id
+    return st.session_state.thread_id
+
+
+def parse_and_render_response(response):
+    try:
+        data = json.loads(response)
+        if 'graph' in data and 'text' in data:
+            if data['graph']['type'] == 'bar':
+                fig = px.bar(x=data['graph']['x'], y=data['graph']['y'], labels=data['graph'].get('labels', {}))
+            elif data['graph']['type'] == 'line':
+                fig = px.line(x=data['graph']['x'], y=data['graph']['y'], labels=data['graph'].get('labels', {}))
+            elif data['graph']['type'] == 'scatter':
+                fig = px.scatter(x=data['graph']['x'], y=data['graph']['y'], labels=data['graph'].get('labels', {}))
+            else:
+                st.warning(f"Unsupported graph type: {data['graph']['type']}")
+                return
+
+            st.plotly_chart(fig)
+            st.write(data['text'])
+        else:
+            st.json(data)
+    except json.JSONDecodeError:
+        st.write(response)
+
+
+def query_assistant(query: str):
+    thread_id = get_or_create_thread()
+    try:
+        client.beta.threads.messages.create(
+            thread_id=thread_id,
+            role="user",
+            content=query
+        )
+
+        run = client.beta.threads.runs.create(
+            thread_id=thread_id,
+            assistant_id=ASSISTANT_ID
+        )
+
+        with st.spinner("Assistant is thinking..."):
+            while run.status not in ["completed", "failed"]:
+                run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+                if run.status == "failed":
+                    st.error("The assistant run failed.")
+                    return None
+
+        messages = client.beta.threads.messages.list(thread_id=thread_id)
+        return messages.data[0].content[0].text.value
+
+    except Exception as e:
+        st.error(f"Error querying assistant: {str(e)}")
+        return None
 
 
 # Helper function to generate a response
 def respond(user_input, instruction=""):
-    response = chat.send_message(instruction + user_input)
-    return response.text
+    return query_assistant(instruction + user_input)
 
 
 # Title of the app
@@ -85,12 +127,19 @@ def get_unique_platforms(data):
     return sorted(platforms)
 
 
-def filter_mentions(data, target, month):
+# def filter_mentions(data, target, month):
+#     filtered_mentions = []
+#     if target in data:
+#         filtered_mentions.extend([mention for mention in data[target]['mentions'] if month in mention['date']])
+#     return filtered_mentions
+def filter_mentions_by_date_range(data, target, start_date, end_date):
     filtered_mentions = []
     if target in data:
-        filtered_mentions.extend([mention for mention in data[target]['mentions'] if month in mention['date']])
+        filtered_mentions.extend(
+            [mention for mention in data[target]['mentions']
+             if start_date <= datetime.strptime(mention['date'][:10], '%Y-%m-%d').date() <= end_date]
+        )
     return filtered_mentions
-
 
 def analyze_sentiment(text):
     analysis = TextBlob(text)
@@ -121,7 +170,7 @@ try:
     )
 
     # Initialize the translation client with the credentials
-    client = translate.Client(credentials=credentials)
+    translation_client = translate.Client(credentials=credentials)
 
 except FileNotFoundError:
     st.error(f"Service account JSON file not found at {json_file_path}. Please check the file path.")
@@ -152,7 +201,7 @@ LANGUAGES = {
 
 def translate_text(text, target_language):
     try:
-        result = client.translate(text, target_language=target_language)
+        result = translation_client.translate(text, target_language=target_language)
         return result['translatedText']
     except Exception as e:
         st.error(f"Translation error: {str(e)}")
@@ -175,7 +224,7 @@ def load_translations(lang):
         "sentiment_analysis_title": _("Sentiment Analysis"),
         "report_title": _("Report"),
         "sentiment_breakdown": _("Sentiment Breakdown"),
-        "world_view_title": _("World View"),
+        "world_view_title": _("Geographical View"),
         "live_updates_title": _("Digital Media Analytics Live Updates"),
         "start_stop_button": _("Update View"),
         "select_target_topic": _("Select The Target Topic"),
@@ -187,7 +236,6 @@ def load_translations(lang):
         "social_media_metrics": _("Social Media Metrics"),
         "platform_performance": _("Platform Performance"),
         "audience_insights": _("Audience Insights"),
-        'data_view': _("Data View"),
         "age_distribution_title": _("Age Group Distribution"),
         "legend_title": _("Age Groups"),
         "download_csv": _("Download CSV"),
@@ -239,38 +287,33 @@ selected_index = options.index(selected_option)
 if selected_index == 0:
     # Load the data
     data = load_data()
-
-    # Extract all months available in the data
-    all_dates = sorted(
-        {mention['date'][:7] for company in data.values() for mention in company['mentions']}
-    )
-
-    # Create a mapping of months to their human-readable names
-    month_name_mapping = {
-        date: f"{calendar.month_name[int(date[5:7])]} {date[:4]}" for date in all_dates
-    }
-
-    # Reverse mapping to get back to the original format
-    name_to_date_mapping = {v: k for k, v in month_name_mapping.items()}
-
     # Input for target entity
-    target_col, month_col = st.columns(2)
+    target_col, date_range_col = st.columns(2)
+
+    # Determine available date range based on data
+    available_dates = sorted(
+        {mention['date'][:10] for company in data.values() for mention in company['mentions']}
+    )
+    if available_dates:
+        min_date = datetime.strptime(available_dates[0], '%Y-%m-%d').date()
+        max_date = datetime.strptime(available_dates[-1], '%Y-%m-%d').date()
+    else:
+        min_date = date.today()
+        max_date = date.today()
+
+    # Allow users to select a date range
+    with date_range_col:
+        start_date, end_date = st.date_input(
+            "Select Date Range",
+            (min_date, max_date),
+            min_value=min_date,
+            max_value=max_date,
+            format="MM/DD/YYYY"
+        )
+
+
     with target_col:
         target = st.multiselect(translations["select_target_topic"], ['Mr Price', 'KZN Government', 'Edgars'], ["Mr Price"])
-
-    with month_col:
-        # Select the month by actual name
-        month_name_display = st.selectbox(translations['select_target_month'], list(month_name_mapping.values()))
-
-    # Get the selected month in original format
-    month_name = name_to_date_mapping[month_name_display]
-
-    # Create a mapping of months to their previous month
-    previous_month = None
-    for idx, date in enumerate(all_dates):
-        if date == month_name and idx > 0:
-            previous_month = all_dates[idx - 1]
-            break
 
 
     # Count mentions by platform for a given month across all selected targets
@@ -287,13 +330,24 @@ if selected_index == 0:
                             mentions_count[platform] = 1
         return mentions_count
 
+        # Ensure target is selected
 
-    # Ensure we're passing all selected companies
-    if target:
-        # Count mentions for the selected and previous months across all targets
-        mentions_current_month = count_mentions(data, target, month_name)
-        mentions_previous_month = count_mentions(data, target, previous_month) if previous_month else {}
-        st.header(translations['monthly_social_engagements_metrics'])
+
+    if target and start_date and end_date:
+        # Count mentions for the selected date range across all targets
+        mentions_in_range = []
+        for selected_target in target:
+            mentions_in_range.extend(filter_mentions_by_date_range(data, selected_target, start_date, end_date))
+
+        # Calculate the previous date range
+        range_duration = end_date - start_date
+        previous_start_date = start_date - range_duration
+        previous_end_date = start_date - timedelta(days=1)
+
+        mentions_in_previous_range = []
+        for selected_target in target:
+            mentions_in_previous_range.extend(
+                filter_mentions_by_date_range(data, selected_target, previous_start_date, previous_end_date))
 
         style_metric_cards(
             background_color="#00000000",  # Set the desired background color
@@ -302,21 +356,34 @@ if selected_index == 0:
             border_color="deepskyblue"  # Set the border color
         )
 
-        # Display metrics with comparison
-        if mentions_current_month:
-            platforms = set(mentions_current_month.keys()).union(set(mentions_previous_month.keys()))
-            # Use st.columns to display multiple metrics in a row
-            cols = st.columns(len(platforms))
+        # Display metrics with platform mention counts and deltas
+        if mentions_in_range:
+            # Count the number of mentions by platform for the current range
+            platform_counts_current = defaultdict(int)
+            for mention in mentions_in_range:
+                platform = mention['platform']
+                platform_counts_current[platform] += 1
+
+            # Count the number of mentions by platform for the previous range
+            platform_counts_previous = defaultdict(int)
+            for mention in mentions_in_previous_range:
+                platform = mention['platform']
+                platform_counts_previous[platform] += 1
+
+            # Display platform counts and deltas over the selected date range
+            platforms = set(platform_counts_current.keys()).union(set(platform_counts_previous.keys()))
+            cols = st.columns(len(platforms))  # Create columns for each platform
             for i, platform in enumerate(platforms):
-                current_value = mentions_current_month.get(platform, 0)
-                previous_value = mentions_previous_month.get(platform, 0) if previous_month else 0
-                difference = current_value - previous_value
+                current_value = platform_counts_current.get(platform, 0)
+                previous_value = platform_counts_previous.get(platform, 0)
+                delta_value = current_value - previous_value  # Calculate delta
 
                 # Display metric in the appropriate column
                 with cols[i]:
-                    st.metric(label=f"{platform}", value=current_value, delta=difference)
+                    st.metric(label=f"{platform}", value=current_value, delta=delta_value)
         else:
-            st.warning("No data available for the selected company in the specified months.")
+            st.warning(f"No data available for the selected date range {start_date} to {end_date}")
+
         style_metric_cards(
             background_color="#00000000",  # Set the desired background color
             border_radius_px=10,  # Set border radius
@@ -474,11 +541,11 @@ if selected_index == 0:
         graph_col, genai_col = st.columns([4, 2])
         with graph_col:
             st.header(translations['data_view'])
-            if target and month_name:
+            if target and start_date and end_date:
                 all_mentions = []
                 # Filter the mentions based on the input
                 for selected_target in target:
-                    mentions = filter_mentions(data, selected_target, month_name)
+                    mentions = filter_mentions_by_date_range(data, selected_target, start_date, end_date)
                     all_mentions.extend(mentions)
 
                 if all_mentions:
@@ -486,7 +553,7 @@ if selected_index == 0:
                     df = pd.DataFrame(all_mentions)
                     st.dataframe(df, use_container_width=True)
                 else:
-                    st.warning(f"No data found for {', '.join(target)} in {month_name_display}")
+                    st.warning(f"No data found for {', '.join(target)} in the range {start_date} - {end_date}")
         with genai_col:
             st.header(translations['gen_ai'])
             # Initialize chat history
@@ -516,6 +583,235 @@ if selected_index == 0:
 
                 # Add assistant response to chat history
                 st.session_state.messages.append({"role": "assistant", "content": response})
+
+    # Ensure we're passing all selected companies
+    # if target:
+    #     # Count mentions for the selected and previous months across all targets
+    #     mentions_current_month = count_mentions(data, target, month_name)
+    #     mentions_previous_month = count_mentions(data, target, previous_month) if previous_month else {}
+    #     st.header(translations['monthly_social_engagements_metrics'])
+    #
+    #     style_metric_cards(
+    #         background_color="#00000000",  # Set the desired background color
+    #         border_radius_px=10,  # Set border radius
+    #         border_left_color="deepskyblue",
+    #         border_color="deepskyblue"  # Set the border color
+    #     )
+    #
+    #     # Display metrics with comparison
+    #     if mentions_current_month:
+    #         platforms = set(mentions_current_month.keys()).union(set(mentions_previous_month.keys()))
+    #         # Use st.columns to display multiple metrics in a row
+    #         cols = st.columns(len(platforms))
+    #         for i, platform in enumerate(platforms):
+    #             current_value = mentions_current_month.get(platform, 0)
+    #             previous_value = mentions_previous_month.get(platform, 0) if previous_month else 0
+    #             difference = current_value - previous_value
+    #
+    #             # Display metric in the appropriate column
+    #             with cols[i]:
+    #                 st.metric(label=f"{platform}", value=current_value, delta=difference)
+    #     else:
+    #         st.warning("No data available for the selected company in the specified months.")
+    #     style_metric_cards(
+    #         background_color="#00000000",  # Set the desired background color
+    #         border_radius_px=10,  # Set border radius
+    #         border_left_color="deepskyblue",
+    #         border_color="deepskyblue"  # Set the border color
+    #     )
+    #
+    #
+    #     def load_live_data():
+    #         # Replace this with your actual data loading logic
+    #         df = pd.DataFrame({
+    #             'date': ['2023-01-01', '2023-01-02', '2023-01-03'],
+    #             'mentions': [100, 200, 300],
+    #             'unique_users': [80, 90, 95],
+    #             'engagement_rate': [60, 62, 64],
+    #             'sentiment_score': [0.7, 0.75, 0.8],
+    #             'total_users': [800, 820, 840],
+    #             'age_group_1824': [20, 22, 24],
+    #             'age_group_2530': [45, 47, 49],
+    #             'age_group_4055': [15, 17, 19],
+    #             'age_group_5565plus': [10, 12, 14]
+    #         })
+    #         return df
+    #
+    #
+    #     def generate_live_updates(data, speed=1):
+    #         """
+    #         Generator function to provide live updates.
+    #         :param data: The loaded DataFrame
+    #         :param speed: Speed multiplier for updates (default is 1)
+    #         """
+    #         data['date'] = pd.to_datetime(data['date'])  # Ensure dates are in datetime format
+    #         sorted_data = data.sort_values(by='date')
+    #
+    #         start_date = sorted_data['date'].min()
+    #         end_date = sorted_data['date'].max()
+    #
+    #         current_date = start_date
+    #
+    #         while current_date <= end_date:
+    #             # Get all mentions for the current date
+    #             current_mentions = sorted_data[sorted_data['date'] <= current_date]
+    #
+    #             yield current_date, current_mentions
+    #
+    #             current_date += timedelta(days=1)
+    #             time.sleep(1 / speed)  # Adjust speed of updates
+    #
+    #
+    #     def display_live_updates(data, translations):
+    #
+    #         c1, c2 = st.columns(2)
+    #         with c1:
+    #             st.header(translations["current_social_engagements"])
+    #         with c2:
+    #             st.write("")
+    #             st.write("")
+    #             st.button(translations["start_stop_button"], disabled=True, use_container_width=True)
+    #
+    #
+    #         st.markdown("""
+    #             <style>
+    #             .container {padding-top: 2rem;}
+    #             .row {display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem;}
+    #             .col {flex-basis: calc(50% - 1rem); margin-right: 1rem;}
+    #             </style>
+    #             """, unsafe_allow_html=True)
+    #
+    #         container = st.container()
+    #
+    #         with container:
+    #             row1 = st.container()
+    #             row2 = st.container()
+    #             row3 = st.container()
+    #
+    #             # Social Media Metrics
+    #             with row1:
+    #                 st.subheader(translations["social_media_metrics"])
+    #
+    #                 # Create a list of metrics with their corresponding labels, values, and deltas
+    #                 metrics = [
+    #                         (("Mentions"), f"{data['mentions'].iloc[-1]:,}",
+    #                          f"{data['mentions'].pct_change().iloc[-1] * 100:.2f}%"),
+    #                         (("Unique Users"), f"{data['unique_users'].iloc[-1]:,}",
+    #                          f"{data['unique_users'].pct_change().iloc[-1] * 100:.2f}%"),
+    #                         (("Engagement Rate"), f"{data['engagement_rate'].iloc[-1]:.2f}%",
+    #                          f"+{data['engagement_rate'].pct_change().iloc[-1] * 100:.2f}%"),
+    #                         (("Sentiment Score"), f"{data['sentiment_score'].iloc[-1]:.4f}",
+    #                          f"+{data['sentiment_score'].pct_change().iloc[-1] * 100:.2f}%"),
+    #                         (("Total Users"), f"{data['total_users'].iloc[-1]:,}",
+    #                          f"+{data['total_users'].pct_change().iloc[-1] * 100:.2f}%")
+    #                     ]
+    #
+    #                 # Create columns for the metrics
+    #                 cols = st.columns(len(metrics))
+    #
+    #                 # Display each metric in its own column
+    #                 for col, (metric, value, delta) in zip(cols, metrics):
+    #                     col.metric(metric, value, delta)
+    #             # Platform Performance
+    #             with row2:
+    #                     st.subheader(translations["platform_performance"])
+    #                     # List of platforms
+    #                     platforms = ['Facebook', 'Instagram', 'Twitter', 'LinkedIn', 'YouTube']
+    #
+    #                     # Create columns for each platform
+    #                     cols = st.columns(len(platforms))
+    #
+    #                     # Display each platform's metric in its own column
+    #                     for col, platform in zip(cols, platforms):
+    #                         col.metric(platform, f"{random.randint(500, 1500):,}", f"+{random.uniform(-5, 5):.2f}%")
+    #
+    #             # Audience Insights
+    #             with row3:
+    #                     st.subheader(translations["audience_insights"])
+    #                     total_users = data['total_users'].iloc[-1]
+    #                     age_groups = {
+    #                         ("18 - 24 years"): data['age_group_1824'].iloc[-1],
+    #                         ("25 - 40 years"): data['age_group_2530'].iloc[-1],
+    #                         ("40 - 55 years"): data['age_group_4055'].iloc[-1],
+    #                         ("55+ years"): data['age_group_5565plus'].iloc[-1]
+    #                     }
+    #
+    #                     # Create a pie chart for age groups
+    #                     chart_data = {
+    #                         "labels": list(age_groups.keys()),
+    #                         "values": list(age_groups.values()),
+    #                         "colors": ["#FFD700", "#32CD32", "#FF8C00", "#4169E1"],
+    #                         "title": translations["age_distribution_title"],
+    #                         "showlegend": True,
+    #                         "legend_title": translations["legend_title"]
+    #                     }
+    #
+    #                     # Display the pie chart
+    #                     pie_chart = create_pie_chart(chart_data)
+    #                     st.plotly_chart(pie_chart, use_container_width=True)
+    #
+    #     def create_pie_chart(data):
+    #         fig = go.Figure(data=[go.Pie(labels=data['labels'], values=data['values'])])
+    #         fig.update_layout(title=data['title'])
+    #         fig.update_traces(hole=.3)
+    #         fig.update_layout(legend=dict(yanchor="top", y=0.99, xanchor="right", x=1.05))
+    #         return fig
+    #
+    #
+    #     # Load data
+    #     live_data = load_live_data()
+    #     # Define a dictionary to map option names to corresponding functions
+    #     display_functions = {
+    #         ("Live Updates"): display_live_updates,
+    #     }
+    #
+    #     # Call the appropriate function based on the selected option
+    #     display_functions["Live Updates"](live_data, translations)
+    #     graph_col, genai_col = st.columns([4, 2])
+    #     with graph_col:
+    #         st.header(translations['data_view'])
+    #         if target and month_name:
+    #             all_mentions = []
+    #             # Filter the mentions based on the input
+    #             for selected_target in target:
+    #                 mentions = filter_mentions(data, selected_target, month_name)
+    #                 all_mentions.extend(mentions)
+    #
+    #             if all_mentions:
+    #                 # Convert mentions to DataFrame
+    #                 df = pd.DataFrame(all_mentions)
+    #                 st.dataframe(df, use_container_width=True)
+    #             else:
+    #                 st.warning(f"No data found for {', '.join(target)} in {month_name_display}")
+    #     with genai_col:
+    #         st.header(translations['gen_ai'])
+    #         # Initialize chat history
+    #         if "messages" not in st.session_state:
+    #             st.session_state.messages = []
+    #
+    #         # Display chat messages from history on app rerun
+    #         for message in st.session_state.messages:
+    #             with st.chat_message(message["role"]):
+    #                 st.markdown(message["content"])
+    #
+    #         # Accept user input in the chat interface
+    #         if prompt := st.chat_input("What would you like to know?"):
+    #             # Add user message to chat history
+    #             st.session_state.messages.append({"role": "user", "content": prompt})
+    #             # Display user message in chat message container
+    #             with st.chat_message("user"):
+    #                 st.markdown(prompt)
+    #
+    #             # Generate assistant response
+    #             response = respond(prompt,
+    #                                f"You are a helpful assistant who answers questions about this dataset {data}")
+    #
+    #             # Display assistant response in chat message container
+    #             with st.chat_message("assistant"):
+    #                 st.markdown(response)
+    #
+    #             # Add assistant response to chat history
+    #             st.session_state.messages.append({"role": "assistant", "content": response})
 
 elif selected_index == 1:
     @st.cache_data
@@ -912,16 +1208,41 @@ elif selected_index == 1:
             else:
                 st.warning(f"No data available for the selected parameters.")
 
+# elif selected_index == 2:
+#     @st.cache_data
+#     def load_data():
+#         with open("data-sources/Mentions-Data.json") as file:
+#             data = json.load(file)
+#         return data
+#
+#
+#     data = load_data()
+#
+#     # Initialize chat history
+#     if "messages" not in st.session_state:
+#         st.session_state.messages = []
+#
+#     # Display chat messages from history on app rerun
+#     for message in st.session_state.messages:
+#         with st.chat_message(message["role"]):
+#             st.markdown(message["content"])
+#
+#     # Accept user input
+#     if prompt := st.chat_input("What is up?"):
+#         # Add user message to chat history
+#         st.session_state.messages.append({"role": "user", "content": prompt})
+#         # Display user message in chat message container
+#         with st.chat_message("user"):
+#             st.markdown(prompt)
+#
+#         # Generate assistant response
+#         response = respond(prompt, f"Reply as an assistant getting your insights from the {data}")
+#         # Display assistant response in chat message container
+#         with st.chat_message("assistant"):
+#             st.markdown(response)
+#         # Add assistant response to chat history
+#         st.session_state.messages.append({"role": "assistant", "content": response})
 elif selected_index == 2:
-    @st.cache_data
-    def load_data():
-        with open("data-sources/Mentions-Data.json") as file:
-            data = json.load(file)
-        return data
-
-
-    data = load_data()
-
     # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -932,7 +1253,7 @@ elif selected_index == 2:
             st.markdown(message["content"])
 
     # Accept user input
-    if prompt := st.chat_input("What is up?"):
+    if prompt := st.chat_input("What would you like to know?"):
         # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
         # Display user message in chat message container
@@ -940,10 +1261,12 @@ elif selected_index == 2:
             st.markdown(prompt)
 
         # Generate assistant response
-        response = respond(prompt, f"Reply as an assistant getting your insights from the {data}")
+        response = respond(prompt, f"You are a helpful assistant who answers questions about social media analytics.")
+
         # Display assistant response in chat message container
         with st.chat_message("assistant"):
             st.markdown(response)
+
         # Add assistant response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
 
@@ -1153,11 +1476,11 @@ elif selected_index == 4:
             }},
 
             colorAxis: {{
-            min: 1,
-            max: 1000,
+            min: 15,
+            max: 100,
             type: 'logarithmic',
-            minColor: '#4a0023',
-            maxColor: '#800020'
+            minColor: '#8B0000',
+            maxColor: '#00008B'
         }},
 
             series: [{{
@@ -1306,9 +1629,16 @@ elif selected_index == 5:
                 }
             },
             "colorAxis": {
+                "stops": [
+                    [0, "#8B0000"],  # Dark red for the minimum value
+                    [0.2, "#FF4500"],  # Red-orange
+                    [0.4, "#FF8C00"],  # Dark orange
+                    [0.6, "#1E90FF"],  # Dodger blue
+                    [0.8, "#4169E1"],  # Royal blue
+                    [1, "#00008B"]  # Dark blue for the maximum value
+                ],
                 "min": 0,
-                "minColor": "#E57373",  # Medium red
-                "maxColor": "#8B0000"  # Very dark red
+                "max": 60,  # Adjust max based on your data range
             },
             "legend": {
                 "align": "center",
