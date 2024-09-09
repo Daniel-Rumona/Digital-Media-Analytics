@@ -9,7 +9,7 @@ import streamlit_highcharts as stc
 from streamlit_option_menu import option_menu
 from streamlit_extras.grid import grid
 from streamlit_extras.metric_cards import style_metric_cards
-
+from streamlit_date_picker import date_range_picker, date_picker, PickerType
 # Set page config at the very beginning
 st.set_page_config(page_title='Social Media Analytics', page_icon='💹', layout="wide")
 
@@ -126,12 +126,6 @@ def get_unique_platforms(data):
             platforms.add(mention['platform'])
     return sorted(platforms)
 
-
-# def filter_mentions(data, target, month):
-#     filtered_mentions = []
-#     if target in data:
-#         filtered_mentions.extend([mention for mention in data[target]['mentions'] if month in mention['date']])
-#     return filtered_mentions
 def filter_mentions_by_date_range(data, target, start_date, end_date):
     filtered_mentions = []
     if target in data:
@@ -1208,41 +1202,8 @@ elif selected_index == 1:
             else:
                 st.warning(f"No data available for the selected parameters.")
 
-# elif selected_index == 2:
-#     @st.cache_data
-#     def load_data():
-#         with open("data-sources/Mentions-Data.json") as file:
-#             data = json.load(file)
-#         return data
-#
-#
-#     data = load_data()
-#
-#     # Initialize chat history
-#     if "messages" not in st.session_state:
-#         st.session_state.messages = []
-#
-#     # Display chat messages from history on app rerun
-#     for message in st.session_state.messages:
-#         with st.chat_message(message["role"]):
-#             st.markdown(message["content"])
-#
-#     # Accept user input
-#     if prompt := st.chat_input("What is up?"):
-#         # Add user message to chat history
-#         st.session_state.messages.append({"role": "user", "content": prompt})
-#         # Display user message in chat message container
-#         with st.chat_message("user"):
-#             st.markdown(prompt)
-#
-#         # Generate assistant response
-#         response = respond(prompt, f"Reply as an assistant getting your insights from the {data}")
-#         # Display assistant response in chat message container
-#         with st.chat_message("assistant"):
-#             st.markdown(response)
-#         # Add assistant response to chat history
-#         st.session_state.messages.append({"role": "assistant", "content": response})
 elif selected_index == 2:
+    data = load_data()
     # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -1260,8 +1221,28 @@ elif selected_index == 2:
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Generate assistant response
-        response = respond(prompt, f"You are a helpful assistant who answers questions about social media analytics.")
+        MAX_CONTENT_LENGTH = 256000  # Maximum length allowed by the API
+        BUFFER_SIZE = 500  # Set a buffer to prevent exceeding the limit
+
+
+        # Function to truncate the data to the maximum allowed size minus the buffer
+        def truncate_data(data, max_length=MAX_CONTENT_LENGTH - BUFFER_SIZE):
+            # Convert data to a string if it's not already a string
+            data_str = str(data)
+            if len(data_str) > max_length:
+                return data_str[:max_length]  # Truncate the data to fit within the buffer
+            return data_str
+
+
+        # Truncate the data with the buffer
+        truncated_data = truncate_data(data)
+
+        # Generate assistant response with truncated data
+        response = respond(prompt,
+                           f"You are a helpful assistant who answers questions about social media analytics. Use this truncated data: {truncated_data}")
+
+        # # Generate assistant response
+        # response = respond(prompt, f"You are a helpful assistant who answers questions about social media analytics.You are to use the data from this file {data}")
 
         # Display assistant response in chat message container
         with st.chat_message("assistant"):
@@ -1270,21 +1251,144 @@ elif selected_index == 2:
         # Add assistant response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
 
+# elif selected_index == 3:
+#     data = load_data()
+#     target_col, month_col, chart_col = st.columns(3)
+#     # Multiselect for target entity
+#     with target_col:
+#         targets = st.multiselect(translations["select_target_topic"], list(data.keys()))
+#
+#     # Mapping month names to keys
+#     month_mapping = {
+#         "August 2024": "2024-08",
+#         "July 2024": "2024-07"
+#     }
+#     with month_col:
+#         # Select the month by actual name
+#         month_name = st.selectbox(translations['select_target_month'], list(month_mapping.keys()))
+#
+#     with chart_col:
+#         # Select the chart type
+#         chart_type = st.selectbox(translations['select_chart_type'], ["sankey", "bar", "radar"])
+#
+#     if targets and month_name:
+#         # Get the corresponding month key from the mapping
+#         month = month_mapping[month_name]
+#
+#         if chart_type == "sankey":
+#             # Initialize data for Sankey chart
+#             sankey_data = []
+#
+#             sentiment_colors = {
+#                 "Positive": "#0000FF",  # Blue for Positive
+#                 "Negative": "#FF0000",  # Red for Negative
+#                 "Neutral": "#FFBF00"  # Amber for Neutral
+#             }
+#
+#             for target in targets:
+#                 mentions = data.get(target, {}).get('mentions', [])
+#                 if mentions:
+#                     # Filter mentions by the selected month
+#                     month_mentions = [mention for mention in mentions if month in mention['date']]
+#                     if month_mentions:
+#                         # Perform sentiment analysis
+#                         sentiments = perform_sentiment_analysis(month_mentions)
+#
+#                         # Get platforms from mentions
+#                         platforms = set(mention['platform'] for mention in month_mentions)
+#
+#                         for platform in platforms:
+#                             platform_mentions = [mention for mention in month_mentions if
+#                                                  mention['platform'] == platform]
+#                             platform_sentiments = perform_sentiment_analysis(platform_mentions)
+#
+#                             for sentiment, count in platform_sentiments.items():
+#                                 sankey_data.append({
+#                                     "from": platform,  # Platform name as the source
+#                                     "to": sentiment,  # Sentiment as the destination
+#                                     "weight": count,
+#                                     "color": sentiment_colors[sentiment]  # Assign color based on sentiment
+#                                 })
+#
+#             if sankey_data:
+#                 sankey_chart_data = {
+#                     "chart": {"type": "sankey"},
+#                     "title": {"text": f"Sankey Chart of Sentiment Analysis for {', '.join(targets)} in {month_name}"},
+#                     "series": [{
+#                         "keys": ["from", "to", "weight", "color"],
+#                         "data": [[item["from"], item["to"], item["weight"], item["color"]] for item in sankey_data],
+#                         "type": "sankey",
+#                         "name": "Sentiment Flow",
+#                         "link": {
+#                             "colorByPoint": True  # Use the color specified for each flow
+#                         },
+#                         "nodes": [{
+#                             "id": sentiment,
+#                             "color": sentiment_colors[sentiment]
+#                         } for sentiment in sentiment_colors.keys()]  # Color blocks for sentiments
+#                     }]
+#                 }
+#                 # Display the Sankey chart
+#                 stc.streamlit_highcharts(sankey_chart_data, height=600)
+#             else:
+#                 st.warning(f"No data found for the selected topics in {month_name}")
+#
+#         else:
+#             # Existing logic for other chart types
+#             series_data = []
+#             for target in targets:
+#                 mentions = data.get(target, {}).get('mentions', [])
+#                 if mentions:
+#                     month_mentions = [mention for mention in mentions if month in mention['date']]
+#                     sentiments = perform_sentiment_analysis(month_mentions)
+#                     if chart_type == "doughnut":
+#                         series_data.append({
+#                             "name": target,
+#                             "data": [
+#                                 {"name": "Positive", "y": sentiments['Positive']},
+#                                 {"name": "Negative", "y": sentiments['Negative']},
+#                                 {"name": "Neutral", "y": sentiments['Neutral']}
+#                             ]
+#                         })
+#                     else:
+#                         series_data.append({
+#                             "name": target,
+#                             "data": [sentiments['Positive'], sentiments['Negative'], sentiments['Neutral']]
+#                         })
+#
+#             if series_data:
+#                 chart_data = {
+#                     "chart": {"type": chart_type if chart_type != "radar" else "line",
+#                               "polar": True if chart_type == "radar" else False},
+#                     "title": {"text": f"Sentiment Analysis for {', '.join(targets)} in {month_name}"},
+#                     "xAxis": {"categories": ["Positive", "Negative", "Neutral"] if chart_type != "doughnut" else None,
+#                               "tickmarkPlacement": "on" if chart_type == "radar" else None},
+#                     "yAxis": {"title": {"text": ""}, "min": 0 if chart_type == "radar" else None},
+#                     "legend": {"enabled": True},
+#                     "series": series_data
+#                 }
+#
+#                 # Display the combined chart
+#                 stc.streamlit_highcharts(chart_data, height=600)
+#
+#             else:
+#                 st.warning(f"No data found for the selected topics in {month_name}")
 elif selected_index == 3:
     data = load_data()
     target_col, month_col, chart_col = st.columns(3)
+
     # Multiselect for target entity
     with target_col:
         targets = st.multiselect(translations["select_target_topic"], list(data.keys()))
 
-    # Mapping month names to keys
-    month_mapping = {
-        "August 2024": "2024-08",
-        "July 2024": "2024-07"
-    }
+    # Generate month_mapping dynamically from the data
+    all_dates = sorted({mention['date'][:7] for company in data.values() for mention in company['mentions']})
+    month_mapping = {f"{calendar.month_name[int(date[5:7])]} {date[:4]}": date for date in all_dates}
+
     with month_col:
         # Select the month by actual name
         month_name = st.selectbox(translations['select_target_month'], list(month_mapping.keys()))
+
     with chart_col:
         # Select the chart type
         chart_type = st.selectbox(translations['select_chart_type'], ["sankey", "bar", "radar"])
@@ -1316,8 +1420,7 @@ elif selected_index == 3:
                         platforms = set(mention['platform'] for mention in month_mentions)
 
                         for platform in platforms:
-                            platform_mentions = [mention for mention in month_mentions if
-                                                 mention['platform'] == platform]
+                            platform_mentions = [mention for mention in month_mentions if mention['platform'] == platform]
                             platform_sentiments = perform_sentiment_analysis(platform_mentions)
 
                             for sentiment, count in platform_sentiments.items():
