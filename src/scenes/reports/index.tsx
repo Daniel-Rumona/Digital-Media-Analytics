@@ -484,7 +484,7 @@ export default function ReportDashboard () {
 
   // --- Render
   return (
-    <Box style={{ minHeight: '100vh', padding: 32, background: '#191A1F' }}>
+    <Box style={{ minHeight: '100vh', padding: 32 }}>
       <Flex justify='flex-end' align='center' mb={6} style={{ gap: 16 }}>
         <RangePicker
           picker='month'
