@@ -115,14 +115,13 @@ export const BackButton = () => (
     as={RouterLink}
     to='/'
     size='xs'
-    colorScheme='teal'
+    colorPalette='teal'
     variant='ghost'
     rounded='full'
     _hover={{ transform: 'translateY(-1px)', boxShadow: 'lg' }}
     _active={{ transform: 'translateY(0)' }}
-    leftIcon={<FiArrowLeft />}
   >
-    Back
+    <FiArrowLeft />
   </Button>
 )
 
