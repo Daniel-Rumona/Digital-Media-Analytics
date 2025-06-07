@@ -5,23 +5,22 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "Bundler",    // (or "node" if you're not using Vite/modern bundler)
+    "moduleResolution": "Bundler",
     "skipLibCheck": true,
     "paths": {
       "@/*": ["./src/*"]
     },
-    "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
-    "noEmit": false,                  // <-- Set to false!
+    "noEmit": false,
     "jsx": "react-jsx",
-    "strict": false,                  // <-- Loosen strictness for easier deployment
-    "noUnusedLocals": false,          // <-- Remove or set to false for CI build
-    "noUnusedParameters": false,      // <-- Remove or set to false for CI build
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": false,
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "composite": true                 // <-- **CRITICAL for project references**
+    "composite": true
   },
   "include": ["src"]
 }
