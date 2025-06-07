@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Table, Button, Tag, Space, Spin } from 'antd'
 import { db } from '@/firebase/firebase'
-import { collection, getDocs, DocumentData } from 'firebase/firestore'
+import { collection, getDocs } from 'firebase/firestore'
+import type { DocumentData } from 'firebase/firestore'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import {
   CheckCircleTwoTone,

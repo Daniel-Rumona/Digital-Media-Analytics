@@ -23,17 +23,12 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithPopup,
-  User
+  signInWithPopup
 } from 'firebase/auth'
+import type { User } from 'firebase/auth'
 import { auth, db } from '@/firebase/firebase'
-import {
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
-  DocumentData
-} from 'firebase/firestore'
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import type { DocumentData } from 'firebase/firestore'
 import { message, Spin } from 'antd'
 
 const MotionBox = motion(Box)

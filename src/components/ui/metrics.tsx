@@ -11,7 +11,8 @@ import {
   Row
 } from 'antd'
 import { db } from '@/firebase/firebase'
-import { collection, getDocs, addDoc, DocumentData } from 'firebase/firestore'
+import { collection, getDocs, addDoc } from 'firebase/firestore'
+import type { DocumentData } from 'firebase/firestore'
 import dayjs, { Dayjs } from 'dayjs'
 
 type PlatformKey = keyof typeof PLATFORM_METRICS
