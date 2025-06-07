@@ -1,0 +1,11 @@
+Model Information:
+* title:	social_media_hologram
+* source:	https://sketchfab.com/3d-models/social-media-hologram-86d184e4a567403ba6195f494db5c1f6
+* author:	mandakeren (https://sketchfab.com/mandakeren)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "social_media_hologram" (https://sketchfab.com/3d-models/social-media-hologram-86d184e4a567403ba6195f494db5c1f6) by mandakeren (https://sketchfab.com/mandakeren) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

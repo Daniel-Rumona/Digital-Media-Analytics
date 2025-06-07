@@ -1,0 +1,902 @@
+[
+    {
+        "Site": "Google",
+        "Metric": "views",
+        "Metric Count": 1970,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Google",
+        "Metric": "views",
+        "Metric Count": 1668,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Google",
+        "Metric": "views",
+        "Metric Count": 134,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Google",
+        "Metric": "views",
+        "Metric Count": 1969,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Google",
+        "Metric": "views",
+        "Metric Count": 1401,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Google",
+        "Metric": "rating",
+        "Metric Count": 4.6,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Google",
+        "Metric": "rating",
+        "Metric Count": 4.4,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Google",
+        "Metric": "rating",
+        "Metric Count": 4.0,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Google",
+        "Metric": "rating",
+        "Metric Count": 4.1,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Google",
+        "Metric": "rating",
+        "Metric Count": 4.7,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Google",
+        "Metric": "reviews",
+        "Metric Count": 1038,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Google",
+        "Metric": "reviews",
+        "Metric Count": 447,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Google",
+        "Metric": "reviews",
+        "Metric Count": 1413,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Google",
+        "Metric": "reviews",
+        "Metric Count": 767,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Google",
+        "Metric": "reviews",
+        "Metric Count": 1692,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Google",
+        "Metric": "directions",
+        "Metric Count": 41,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Google",
+        "Metric": "directions",
+        "Metric Count": 43,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Google",
+        "Metric": "directions",
+        "Metric Count": 135,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Google",
+        "Metric": "directions",
+        "Metric Count": 12,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Google",
+        "Metric": "directions",
+        "Metric Count": 9,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Google",
+        "Metric": "website clicks",
+        "Metric Count": 8,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Google",
+        "Metric": "website clicks",
+        "Metric Count": 55,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Google",
+        "Metric": "website clicks",
+        "Metric Count": 79,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Google",
+        "Metric": "website clicks",
+        "Metric Count": 85,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Google",
+        "Metric": "website clicks",
+        "Metric Count": 135,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Google",
+        "Metric": "messages",
+        "Metric Count": 13,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Google",
+        "Metric": "messages",
+        "Metric Count": 17,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Google",
+        "Metric": "messages",
+        "Metric Count": 11,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Google",
+        "Metric": "messages",
+        "Metric Count": 143,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Google",
+        "Metric": "messages",
+        "Metric Count": 124,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Google",
+        "Metric": "calls",
+        "Metric Count": 68,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Google",
+        "Metric": "calls",
+        "Metric Count": 44,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Google",
+        "Metric": "calls",
+        "Metric Count": 103,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Google",
+        "Metric": "calls",
+        "Metric Count": 59,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Google",
+        "Metric": "calls",
+        "Metric Count": 55,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Google",
+        "Metric": "booking clicks",
+        "Metric Count": 19,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Google",
+        "Metric": "booking clicks",
+        "Metric Count": 16,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Google",
+        "Metric": "booking clicks",
+        "Metric Count": 13,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Google",
+        "Metric": "booking clicks",
+        "Metric Count": 56,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Google",
+        "Metric": "booking clicks",
+        "Metric Count": 9,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "views",
+        "Metric Count": 697,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "views",
+        "Metric Count": 1811,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "views",
+        "Metric Count": 172,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "views",
+        "Metric Count": 248,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "views",
+        "Metric Count": 147,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "followers",
+        "Metric Count": 129,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "followers",
+        "Metric Count": 19,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "followers",
+        "Metric Count": 4,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "followers",
+        "Metric Count": 101,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "followers",
+        "Metric Count": 107,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "posts",
+        "Metric Count": 110,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "posts",
+        "Metric Count": 41,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "posts",
+        "Metric Count": 40,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "posts",
+        "Metric Count": 79,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "posts",
+        "Metric Count": 128,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "link clicks",
+        "Metric Count": 83,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "link clicks",
+        "Metric Count": 55,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "link clicks",
+        "Metric Count": 143,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "link clicks",
+        "Metric Count": 72,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "link clicks",
+        "Metric Count": 53,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "reactions",
+        "Metric Count": 25,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "reactions",
+        "Metric Count": 81,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "reactions",
+        "Metric Count": 45,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "reactions",
+        "Metric Count": 87,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "reactions",
+        "Metric Count": 125,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "content interactions",
+        "Metric Count": 1585,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "content interactions",
+        "Metric Count": 1964,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "content interactions",
+        "Metric Count": 649,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "content interactions",
+        "Metric Count": 1487,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "content interactions",
+        "Metric Count": 1656,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "visits",
+        "Metric Count": 67,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "visits",
+        "Metric Count": 87,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "visits",
+        "Metric Count": 61,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "visits",
+        "Metric Count": 149,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Facebook",
+        "Metric": "visits",
+        "Metric Count": 103,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "views",
+        "Metric Count": 1168,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "views",
+        "Metric Count": 139,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "views",
+        "Metric Count": 873,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "views",
+        "Metric Count": 211,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "views",
+        "Metric Count": 503,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "followers",
+        "Metric Count": 61,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "followers",
+        "Metric Count": 74,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "followers",
+        "Metric Count": 131,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "followers",
+        "Metric Count": 8,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "followers",
+        "Metric Count": 52,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "posts",
+        "Metric Count": 80,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "posts",
+        "Metric Count": 108,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "posts",
+        "Metric Count": 4,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "posts",
+        "Metric Count": 103,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "posts",
+        "Metric Count": 38,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "likes",
+        "Metric Count": 19,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "likes",
+        "Metric Count": 85,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "likes",
+        "Metric Count": 124,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "likes",
+        "Metric Count": 16,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "likes",
+        "Metric Count": 113,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "content interactions",
+        "Metric Count": 628,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "content interactions",
+        "Metric Count": 1125,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "content interactions",
+        "Metric Count": 1028,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "content interactions",
+        "Metric Count": 961,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "content interactions",
+        "Metric Count": 119,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "reach",
+        "Metric Count": 27,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "reach",
+        "Metric Count": 75,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "reach",
+        "Metric Count": 85,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "reach",
+        "Metric Count": 30,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "reach",
+        "Metric Count": 126,
+        "date": "2025-05"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "visits",
+        "Metric Count": 43,
+        "date": "2025-01"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "visits",
+        "Metric Count": 106,
+        "date": "2025-02"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "visits",
+        "Metric Count": 138,
+        "date": "2025-03"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "visits",
+        "Metric Count": 11,
+        "date": "2025-04"
+    },
+    {
+        "Site": "Instagram",
+        "Metric": "visits",
+        "Metric Count": 85,
+        "date": "2025-05"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "views",
+        "Metric Count": 920,
+        "date": "2025-01"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "views",
+        "Metric Count": 1647,
+        "date": "2025-02"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "views",
+        "Metric Count": 792,
+        "date": "2025-03"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "views",
+        "Metric Count": 290,
+        "date": "2025-04"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "views",
+        "Metric Count": 604,
+        "date": "2025-05"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "followers",
+        "Metric Count": 139,
+        "date": "2025-01"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "followers",
+        "Metric Count": 96,
+        "date": "2025-02"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "followers",
+        "Metric Count": 11,
+        "date": "2025-03"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "followers",
+        "Metric Count": 41,
+        "date": "2025-04"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "followers",
+        "Metric Count": 100,
+        "date": "2025-05"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "posts",
+        "Metric Count": 133,
+        "date": "2025-01"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "posts",
+        "Metric Count": 74,
+        "date": "2025-02"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "posts",
+        "Metric Count": 144,
+        "date": "2025-03"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "posts",
+        "Metric Count": 39,
+        "date": "2025-04"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "posts",
+        "Metric Count": 149,
+        "date": "2025-05"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "likes",
+        "Metric Count": 148,
+        "date": "2025-01"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "likes",
+        "Metric Count": 54,
+        "date": "2025-02"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "likes",
+        "Metric Count": 131,
+        "date": "2025-03"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "likes",
+        "Metric Count": 4,
+        "date": "2025-04"
+    },
+    {
+        "Site": "TikTok",
+        "Metric": "likes",
+        "Metric Count": 85,
+        "date": "2025-05"
+    },
+    {
+        "Site": "X",
+        "Metric": "views",
+        "Metric Count": 1244,
+        "date": "2025-01"
+    },
+    {
+        "Site": "X",
+        "Metric": "views",
+        "Metric Count": 844,
+        "date": "2025-02"
+    },
+    {
+        "Site": "X",
+        "Metric": "views",
+        "Metric Count": 1392,
+        "date": "2025-03"
+    },
+    {
+        "Site": "X",
+        "Metric": "views",
+        "Metric Count": 1757,
+        "date": "2025-04"
+    },
+    {
+        "Site": "X",
+        "Metric": "views",
+        "Metric Count": 1336,
+        "date": "2025-05"
+    },
+    {
+        "Site": "X",
+        "Metric": "followers",
+        "Metric Count": 99,
+        "date": "2025-01"
+    },
+    {
+        "Site": "X",
+        "Metric": "followers",
+        "Metric Count": 62,
+        "date": "2025-02"
+    },
+    {
+        "Site": "X",
+        "Metric": "followers",
+        "Metric Count": 69,
+        "date": "2025-03"
+    },
+    {
+        "Site": "X",
+        "Metric": "followers",
+        "Metric Count": 93,
+        "date": "2025-04"
+    },
+    {
+        "Site": "X",
+        "Metric": "followers",
+        "Metric Count": 45,
+        "date": "2025-05"
+    },
+    {
+        "Site": "X",
+        "Metric": "posts",
+        "Metric Count": 83,
+        "date": "2025-01"
+    },
+    {
+        "Site": "X",
+        "Metric": "posts",
+        "Metric Count": 50,
+        "date": "2025-02"
+    },
+    {
+        "Site": "X",
+        "Metric": "posts",
+        "Metric Count": 13,
+        "date": "2025-03"
+    },
+    {
+        "Site": "X",
+        "Metric": "posts",
+        "Metric Count": 109,
+        "date": "2025-04"
+    },
+    {
+        "Site": "X",
+        "Metric": "posts",
+        "Metric Count": 7,
+        "date": "2025-05"
+    },
+    {
+        "Site": "X",
+        "Metric": "likes",
+        "Metric Count": 3,
+        "date": "2025-01"
+    },
+    {
+        "Site": "X",
+        "Metric": "likes",
+        "Metric Count": 25,
+        "date": "2025-02"
+    },
+    {
+        "Site": "X",
+        "Metric": "likes",
+        "Metric Count": 54,
+        "date": "2025-03"
+    },
+    {
+        "Site": "X",
+        "Metric": "likes",
+        "Metric Count": 127,
+        "date": "2025-04"
+    },
+    {
+        "Site": "X",
+        "Metric": "likes",
+        "Metric Count": 94,
+        "date": "2025-05"
+    }
+]
