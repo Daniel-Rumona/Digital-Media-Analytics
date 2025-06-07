@@ -38,14 +38,13 @@ export const BackButton = () => (
     as={RouterLink}
     to='/'
     size='xs'
-    colorScheme='teal'
+    colorPalette='teal'
     variant='ghost'
     rounded='full'
     _hover={{ transform: 'translateY(-1px)', boxShadow: 'lg' }}
     _active={{ transform: 'translateY(0)' }}
-    leftIcon={<FiArrowLeft />}
   >
-    Back
+    <FiArrowLeft />
   </Button>
 )
 
@@ -266,16 +265,16 @@ const LoginPage = () => {
           />
 
           <ButtonGroup width='100%' size='sm' variant='outline' spacing={2}>
-            <Button
+             <Button
               size='lg'
-              variant='outline'
-              colorScheme='cyan'
+              variant='surface'
+              colorPalette={'cyan'}
               rounded='full'
               mt={2}
               _hover={{ transform: 'translateY(-2px)' }}
               onClick={handleLogin}
-              isLoading={loading}
-              isDisabled={!email || !password || loading}
+              loading={loading}
+              disabled={!email || !password || loading}
             >
               Login
             </Button>
