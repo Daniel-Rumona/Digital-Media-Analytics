@@ -1,17 +1,47 @@
-import React, { useState } from 'react'
+import React, { useState, FC } from 'react'
 import { Row, Col, Card, Modal, Button } from 'antd'
-import Highcharts, { chart } from 'highcharts'
+import Highcharts, { Options, Chart } from 'highcharts'
 import HighchartsReact from 'highcharts-react-official'
 import wordcloud from 'highcharts/modules/wordcloud'
 import solidGauge from 'highcharts/modules/solid-gauge'
 import { ExpandOutlined } from '@ant-design/icons'
 
-if (typeof Highcharts === 'function') {
+// TypeScript module augmentation for Highcharts
+if (typeof Highcharts === 'object') {
   wordcloud(Highcharts)
   solidGauge(Highcharts)
 }
 
-const sentimentData = {
+// --- Types
+type SentimentPoint = { name: string; y: number; color: string }
+type TrendPoint = {
+  month: string
+  positive: number
+  neutral: number
+  negative: number
+}
+type PlatformPoint = {
+  platform: string
+  positive: number
+  neutral: number
+  negative: number
+}
+type WordCloudPoint = { name: string; weight: number }
+
+interface ChartCardProps {
+  title: string
+  options: Options
+}
+
+interface SentimentDataType {
+  overall: SentimentPoint[]
+  trends: TrendPoint[]
+  platforms: PlatformPoint[]
+  wordCloud: WordCloudPoint[]
+  sentimentScore: number
+}
+
+const sentimentData: SentimentDataType = {
   overall: [
     { name: 'Positive', y: 48, color: '#4caf50' },
     { name: 'Neutral', y: 30, color: '#ff9800' },
@@ -53,6 +83,7 @@ const sentimentData = {
   sentimentScore: 74
 }
 
+// Highcharts default dark styles
 Highcharts.setOptions({
   chart: {
     backgroundColor: 'transparent',
@@ -76,7 +107,7 @@ Highcharts.setOptions({
   },
   legend: {
     itemStyle: { color: '#fff' },
-    itemHoverStyle: { color: '#ffd700' }, // Optional: highlight on hover
+    itemHoverStyle: { color: '#ffd700' },
     backgroundColor: 'transparent'
   },
   tooltip: {
@@ -92,9 +123,9 @@ Highcharts.setOptions({
   }
 })
 
-const ChartCard = ({ title, options }) => {
+// --- ChartCard (typed)
+const ChartCard: FC<ChartCardProps> = ({ title, options }) => {
   const [visible, setVisible] = useState(false)
-
   return (
     <>
       <Card
@@ -124,122 +155,83 @@ const ChartCard = ({ title, options }) => {
   )
 }
 
-const SentimentAnalysis = () => {
+// --- Main
+const SentimentAnalysis: FC = () => {
   const totalKeywords = sentimentData.wordCloud.reduce(
     (sum, word) => sum + word.weight,
     0
   )
 
-  const donutOptions = {
+  // Donut chart for overall sentiment
+  const donutOptions: Options = {
     chart: {
       type: 'pie',
-      custom: {},
       events: {
-        render () {
-          const chart = this,
-            series = chart.series[0]
-
-          let customLabel = chart.options.chart.custom.label
-
+        render (this: Chart) {
+          const chart = this
+          // Custom label
+          let customLabel = (chart as any).customLabel
           if (!customLabel) {
-            customLabel = chart.options.chart.custom.label = chart.renderer
+            customLabel = (chart as any).customLabel = chart.renderer
               .label(
-                'Total Keywords<br/>' + `<strong>${totalKeywords}</strong>`
+                `Total Keywords<br/><strong>${totalKeywords}</strong>`,
+                chart.plotWidth / 2,
+                chart.plotHeight / 2,
+                null,
+                0,
+                0,
+                true
               )
               .css({
                 color: '#fff',
                 textAlign: 'center'
               })
-              .attr({
-                align: 'center'
-              })
+              .attr({ align: 'center', zIndex: 10 })
               .add()
           }
-
-          const x = series.center[0] + chart.plotLeft,
-            y =
+          const series = chart.series[0]
+          if (series) {
+            const x = series.center[0] + chart.plotLeft
+            const y =
               series.center[1] +
               chart.plotTop -
               customLabel.getBBox().height / 2
-
-          customLabel.attr({
-            x,
-            y
-          })
-
-          customLabel.css({
-            fontSize: `${series.center[2] / 12}px`
-          })
+            customLabel.attr({ x, y })
+            customLabel.css({
+              fontSize: `${series.center[2] / 12}px`
+            })
+          }
         }
-      }
+      } as any // Chart events type fudge for Highcharts
     },
-    title: {
-      text: null
-    },
-    accessibility: {
-      point: {
-        valueSuffix: '%'
-      }
-    },
-    xAxis: {
-      lineColor: '#fff', // Axis line
-      tickColor: '#fff', // Tick marks
-      labels: {
-        style: { color: '#fff' } // Axis labels
-      },
-      title: {
-        style: { color: '#fff' } // Axis title
-      }
-    },
-    yAxis: {
-      lineColor: '#fff', // Axis line
-      tickColor: '#fff', // Tick marks
-      gridLineColor: '#444', // Optional: grid lines (keep darker for subtlety)
-      labels: {
-        style: { color: '#fff' }
-      },
-      title: {
-        style: { color: '#fff' }
+    title: { text: null },
+    accessibility: { point: { valueSuffix: '%' } },
+    plotOptions: {
+      pie: {
+        innerSize: '70%',
+        borderRadius: 8,
+        dataLabels: {
+          enabled: true,
+          format: '{point.name}: {point.percentage:.1f}%',
+          color: '#fff'
+        }
       }
     },
     tooltip: {
       pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>'
     },
-    plotOptions: {
-      series: {
-        innerSize: '70%',
-        borderRadius: 8,
-        cursor: 'pointer',
-        dataLabels: [
-          {
-            enabled: true,
-            distance: 20,
-            format: '{point.name}',
-            color: '#fff'
-          },
-          {
-            enabled: true,
-            distance: -25,
-            format: '{point.percentage:.1f}%',
-            style: {
-              fontSize: '0.9em',
-              textOutline: 'none',
-              color: '#fff'
-            }
-          }
-        ]
-      }
-    },
     series: [
       {
         name: 'Sentiment',
+        type: 'pie',
         data: sentimentData.overall
       }
     ],
     credits: { enabled: false }
   }
 
-  const gaugeOptions = {
+  // Gauge chart for overall sentiment score
+  const gaugeOptions: Options = {
     chart: { type: 'solidgauge' },
     title: null,
     pane: {
@@ -247,7 +239,7 @@ const SentimentAnalysis = () => {
       endAngle: 90,
       background: {
         backgroundColor:
-          Highcharts.defaultOptions.legend.backgroundColor || '#23232e', // use your card bg or transparent
+          Highcharts.defaultOptions.legend?.backgroundColor || '#23232e',
         borderRadius: 5,
         innerRadius: '60%',
         outerRadius: '100%',
@@ -255,138 +247,100 @@ const SentimentAnalysis = () => {
       }
     },
     yAxis: {
+      min: 0,
+      max: 100,
       stops: [
-        [0.1, '#F56565'], // green
+        [0.1, '#F56565'], // red
         [0.5, '#F6E05E'], // yellow
-        [0.9, '#48BB78'] // red
+        [0.9, '#48BB78'] // green
       ],
       lineWidth: 0,
       tickWidth: 0,
       minorTickInterval: null,
       tickAmount: 2,
-      title: { y: -70 },
       labels: { y: 16, style: { color: '#fff' } }
     },
-    series: [{ name: 'Sentiment Score', data: [sentimentData.sentimentScore] }]
+    series: [
+      {
+        name: 'Sentiment Score',
+        type: 'solidgauge',
+        data: [sentimentData.sentimentScore]
+      }
+    ]
   }
 
-  const lineOptions = {
+  // Trends over time (line)
+  const lineOptions: Options = {
     title: { text: null },
     chart: { type: 'spline' },
-    legend: {
-      itemStyle: {
-        color: '#fff', // White legend text
-        fontWeight: 'normal' // Optional: keep font clean
-      },
-      itemHoverStyle: {
-        color: '#ffd700' // Optional: gold/yellow on hover for nice contrast
-      },
-      backgroundColor: 'transparent' // Keeps the legend background clear/dark
-    },
     xAxis: {
-      categories: sentimentData.trends.map(d => d.date),
-      lineColor: '#fff', // Axis line
-      tickColor: '#fff', // Tick marks
-      labels: {
-        style: { color: '#fff' } // Axis labels
-      },
-      title: {
-        style: { color: '#fff' } // Axis title
-      }
-    },
-    yAxis: {
-      lineColor: '#fff', // Axis line
-      tickColor: '#fff', // Tick marks
-      gridLineColor: '#444', // Optional: grid lines (keep darker for subtlety)
-      labels: {
-        style: { color: '#fff' }
-      },
-      title: {
-        style: { color: '#fff' }
-      }
+      categories: sentimentData.trends.map(d => d.month)
     },
     series: [
       {
         name: 'Positive',
+        type: 'spline',
         data: sentimentData.trends.map(d => d.positive),
         color: '#4caf50'
       },
       {
         name: 'Neutral',
+        type: 'spline',
         data: sentimentData.trends.map(d => d.neutral),
         color: '#ff9800'
       },
       {
         name: 'Negative',
+        type: 'spline',
         data: sentimentData.trends.map(d => d.negative),
         color: '#f44336'
       }
     ]
   }
 
-  const barOptions = {
+  // Platform comparison (bar)
+  const barOptions: Options = {
     chart: { type: 'column' },
     title: { text: null },
-    legend: {
-      itemStyle: {
-        color: '#fff', // White legend text
-        fontWeight: 'normal' // Optional: keep font clean
-      },
-      itemHoverStyle: {
-        color: '#ffd700' // Optional: gold/yellow on hover for nice contrast
-      },
-      backgroundColor: 'transparent' // Keeps the legend background clear/dark
-    },
     xAxis: {
-      categories: sentimentData.platforms.map(p => p.platform),
-      lineColor: '#fff', // Axis line
-      tickColor: '#fff', // Tick marks
-      labels: {
-        style: { color: '#fff' } // Axis labels
-      },
-      title: {
-        style: { color: '#fff' } // Axis title
-      }
-    },
-    yAxis: {
-      lineColor: '#fff', // Axis line
-      tickColor: '#fff', // Tick marks
-      gridLineColor: '#444', // Optional: grid lines (keep darker for subtlety)
-      labels: {
-        style: { color: '#fff' }
-      },
-      title: {
-        style: { color: '#fff' }
-      }
+      categories: sentimentData.platforms.map(p => p.platform)
     },
     series: [
       {
         name: 'Positive',
+        type: 'column',
         data: sentimentData.platforms.map(p => p.positive),
         color: '#4caf50'
       },
       {
         name: 'Neutral',
+        type: 'column',
         data: sentimentData.platforms.map(p => p.neutral),
         color: '#ff9800'
       },
       {
         name: 'Negative',
+        type: 'column',
         data: sentimentData.platforms.map(p => p.negative),
         color: '#f44336'
       }
     ]
   }
 
-  const wordCloudOptions = {
+  // Word cloud chart
+  const wordCloudOptions: Options = {
+    title: { text: null },
     series: [
-      { name: 'Keywords', type: 'wordcloud', data: sentimentData.wordCloud }
-    ],
-    title: { text: null }
+      {
+        name: 'Keywords',
+        type: 'wordcloud',
+        data: sentimentData.wordCloud
+      }
+    ]
   }
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: 24 }}>
       <Row gutter={16}>
         <Col xs={24} md={12}>
           <ChartCard title='Overall Sentiment' options={donutOptions} />

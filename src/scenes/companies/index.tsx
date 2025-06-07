@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Table, Button, Tag, Space, Spin } from 'antd'
 import { db } from '@/firebase/firebase'
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, getDocs, DocumentData } from 'firebase/firestore'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import {
   CheckCircleTwoTone,
@@ -10,13 +10,26 @@ import {
 } from '@ant-design/icons'
 import CompanyManageModal from './CompanyManageModal'
 
+// --- Types ---
+type Account = {
+  platform: string
+  handle: string
+  connected: boolean
+}
+
+type Company = {
+  id: string
+  companyName: string
+  accounts: Account[]
+}
+
 const CompaniesTable = () => {
-  const [companies, setCompanies] = useState([])
-  const [showModal, setShowModal] = useState(false)
-  const [editCompany, setEditCompany] = useState(null)
-  const [modalKey, setModalKey] = useState(0)
-  const [userId, setUserId] = useState(null)
-  const [authLoading, setAuthLoading] = useState(true)
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [showModal, setShowModal] = useState<boolean>(false)
+  const [editCompany, setEditCompany] = useState<Company | null>(null)
+  const [modalKey, setModalKey] = useState<number>(0)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [authLoading, setAuthLoading] = useState<boolean>(true)
 
   // Listen for auth changes and set userId
   useEffect(() => {
@@ -37,10 +50,20 @@ const CompaniesTable = () => {
     if (!userId) return
     const snap = await getDocs(collection(db, 'users', userId, 'companies'))
     setCompanies(
-      snap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
+      snap.docs.map(doc => {
+        const data = doc.data() as Omit<Company, 'id'>
+        return {
+          id: doc.id,
+          ...data,
+          accounts: Array.isArray(data.accounts)
+            ? data.accounts.map(a => ({
+                platform: a.platform,
+                handle: a.handle,
+                connected: !!a.connected
+              }))
+            : []
+        }
+      })
     )
   }
 
@@ -49,14 +72,14 @@ const CompaniesTable = () => {
     // eslint-disable-next-line
   }, [userId])
 
-  // Table columns (unchanged)
+  // Table columns
   const columns = [
     { title: 'Company', dataIndex: 'companyName', key: 'companyName' },
     {
       title: 'Platforms',
       dataIndex: 'accounts',
       key: 'accounts',
-      render: accounts =>
+      render: (accounts: Account[]) =>
         accounts && accounts.length > 0 ? (
           accounts.map(acc => (
             <Tag key={acc.platform} color='blue'>
@@ -71,7 +94,7 @@ const CompaniesTable = () => {
       title: 'Handles',
       dataIndex: 'accounts',
       key: 'handles',
-      render: accounts =>
+      render: (accounts: Account[]) =>
         accounts && accounts.length > 0 ? (
           accounts.map(acc => (
             <Tag key={acc.handle} color='purple'>
@@ -86,7 +109,7 @@ const CompaniesTable = () => {
       title: 'Connected',
       dataIndex: 'accounts',
       key: 'connected',
-      render: accounts =>
+      render: (accounts: Account[]) =>
         accounts && accounts.length > 0 ? (
           <Tag color='green'>
             {accounts.filter(acc => acc.connected).length} / {accounts.length}
@@ -98,7 +121,7 @@ const CompaniesTable = () => {
     {
       title: 'Action',
       key: 'action',
-      render: (_, record) => (
+      render: (_: any, record: Company) => (
         <Space>
           <Button
             size='small'
@@ -115,9 +138,9 @@ const CompaniesTable = () => {
     }
   ]
 
-  // Expandable row: platforms with status/connect (unchanged)
-  const expandedRowRender = company => (
-    <Table
+  // Expandable row: platforms with status/connect
+  const expandedRowRender = (company: Company) => (
+    <Table<Account>
       size='small'
       columns={[
         {
@@ -134,7 +157,7 @@ const CompaniesTable = () => {
           title: 'Connected',
           dataIndex: 'connected',
           key: 'connected',
-          render: connected =>
+          render: (connected: boolean) =>
             connected ? (
               <Tag
                 icon={<CheckCircleTwoTone twoToneColor='#52c41a' />}
@@ -154,7 +177,7 @@ const CompaniesTable = () => {
         {
           title: 'OAuth',
           key: 'oauth',
-          render: (_, acc, idx) => (
+          render: (_: any, acc: Account, idx: number) => (
             <Button
               type={acc.connected ? 'default' : 'primary'}
               size='small'
@@ -175,8 +198,9 @@ const CompaniesTable = () => {
           )
         }
       ]}
-      dataSource={company.accounts?.map((a, idx) => ({ ...a, key: idx }))}
+      dataSource={company.accounts?.map((a, idx) => ({ ...a, key: idx })) || []}
       pagination={false}
+      rowKey='key'
     />
   )
 
@@ -199,7 +223,7 @@ const CompaniesTable = () => {
       >
         Add Company
       </Button>
-      <Table
+      <Table<Company>
         columns={columns}
         dataSource={companies}
         rowKey='id'

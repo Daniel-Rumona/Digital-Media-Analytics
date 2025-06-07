@@ -11,7 +11,6 @@ import {
   FiTrendingUp,
   FiUsers
 } from 'react-icons/fi'
-
 import {
   Divider,
   Avatar,
@@ -32,6 +31,13 @@ import {
 } from '@ant-design/icons'
 import { signOut } from 'firebase/auth'
 import CompanySetupModal from '../metrics'
+import type { MenuProps } from 'antd'
+
+type SidebarProps = {
+  collapsed: boolean
+  onToggle: () => void
+  onOpenCompanyModal: () => void
+}
 
 const SidebarItems = [
   { label: 'Dashboard', icon: FiHome, path: '/dashboard' },
@@ -47,20 +53,24 @@ const SidebarItems = [
   { label: 'Accounts Setup', icon: FiUsers, path: '/companies' }
 ]
 
-const Sidebar = ({ collapsed, onToggle, onOpenCompanyModal }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  collapsed,
+  onToggle,
+  onOpenCompanyModal
+}) => {
   const bg = useColorModeValue('gray.800', 'gray.900')
   const textColor = 'white'
-  const { companies, selectedCompanyId, setSelectedCompanyId, companyData } =
+  const { companies, selectedCompanyId, setSelectedCompanyId } =
     useCompanyData()
+  const location = useLocation()
 
   // AntD Dropdown items for company switch
-  const items = companies.map(c => ({
+  const items: MenuProps['items'] = companies.map(c => ({
     key: c.id,
     label: c.companyName,
     onClick: () => setSelectedCompanyId(c.id)
   }))
 
-  // Find the selected company
   const selectedCompany = companies.find(c => c.id === selectedCompanyId) ||
     companies[0] || { companyName: 'Select Company' }
 
@@ -134,10 +144,9 @@ const Sidebar = ({ collapsed, onToggle, onOpenCompanyModal }) => {
           size='sm'
           onClick={onToggle}
           variant='ghost'
-          colorPalette='white'
-        >
-          <FiMenu />
-        </IconButton>
+          colorScheme='whiteAlpha'
+          icon={<FiMenu />}
+        />
       </Flex>
 
       <Divider style={{ borderColor: '#4A5568', marginBottom: '16px' }} />
@@ -188,7 +197,8 @@ const Sidebar = ({ collapsed, onToggle, onOpenCompanyModal }) => {
   )
 }
 
-const Topbar = ({ collapsed }) => {
+type TopbarProps = { collapsed: boolean }
+const Topbar: React.FC<TopbarProps> = ({ collapsed }) => {
   const { companyData } = useCompanyData()
   const location = useLocation()
   const path = location.pathname.replace('/', '')
@@ -199,33 +209,29 @@ const Topbar = ({ collapsed }) => {
   const [drawerTab, setDrawerTab] = useState('account')
   const navigate = useNavigate()
 
-  // -- Avatar Dropdown Menu
-  const menu = (
-    <Menu
-      items={[
-        {
-          key: 'manage',
-          icon: <SettingOutlined />,
-          label: 'Manage Account',
-          onClick: () => {
-            setDrawerTab('account')
-            setDrawerOpen(true)
-          }
-        },
-        {
-          key: 'logout',
-          icon: <LogoutOutlined />,
-          label: 'Logout',
-          onClick: async () => {
-            await signOut(auth)
-            message.success('Logged out!')
-            navigate('/login')
-          }
+  const menu: MenuProps = {
+    items: [
+      {
+        key: 'manage',
+        icon: <SettingOutlined />,
+        label: 'Manage Account',
+        onClick: () => {
+          setDrawerTab('account')
+          setDrawerOpen(true)
         }
-      ]}
-      style={{ background: '#181a20', color: '#fff', minWidth: 170 }}
-    />
-  )
+      },
+      {
+        key: 'logout',
+        icon: <LogoutOutlined />,
+        label: 'Logout',
+        onClick: async () => {
+          await signOut(auth)
+          message.success('Logged out!')
+          navigate('/login')
+        }
+      }
+    ]
+  }
 
   return (
     <>
@@ -269,7 +275,7 @@ const Topbar = ({ collapsed }) => {
         >
           {companyData?.companyName || 'No Company'}
         </Text>
-        <Dropdown overlay={menu} placement='bottomRight' trigger={['click']}>
+        <Dropdown menu={menu} placement='bottomRight' trigger={['click']}>
           <Avatar
             src='https://bit.ly/sage-adebayo'
             style={{ cursor: 'pointer', border: '2px solid #096dd9' }}
@@ -287,7 +293,8 @@ const Topbar = ({ collapsed }) => {
   )
 }
 
-const Layout = ({ children }) => {
+type LayoutProps = { children: React.ReactNode }
+const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false)
   const toggleSidebar = () => setCollapsed(!collapsed)
   const [showCompanyModal, setShowCompanyModal] = useState(false)
@@ -313,9 +320,8 @@ const Layout = ({ children }) => {
       </Box>
       <CompanySetupModal
         open={showCompanyModal}
-        userId={user?.uid || ''} // Pass the current user id
+        userId={user?.uid || ''}
         onCancel={() => setShowCompanyModal(false)}
-        // onComplete={() => setShowCompanyModal(false)}
       />
     </>
   )

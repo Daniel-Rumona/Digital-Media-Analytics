@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Row,
   Col,
@@ -17,16 +17,17 @@ import {
   FiThumbsUp,
   FiEdit,
   FiDownload,
-  FiLink
+  FiLink,
+  FiMaximize2
 } from 'react-icons/fi'
 import Highcharts from 'highcharts'
+import type { Options as HighchartsOptions } from 'highcharts'
 import HighchartsReact from 'highcharts-react-official'
 import HighchartsMore from 'highcharts/highcharts-more'
 import HighchartsFunnel from 'highcharts/modules/funnel'
 import html2pdf from 'html2pdf.js'
-import dayjs from 'dayjs'
+import dayjs, { Dayjs } from 'dayjs'
 import { motion } from 'framer-motion'
-import { FiMaximize2 } from 'react-icons/fi'
 import { useCompanyData } from '@/context/company-data-context'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
@@ -38,41 +39,59 @@ const { RangePicker, MonthPicker } = DatePicker
 const { Text, Title, Paragraph } = Typography
 const MotionIcon = motion(FiMaximize2)
 
+// For Highcharts modules
 if (typeof HighchartsFunnel === 'function') HighchartsFunnel(Highcharts)
 if (typeof HighchartsMore === 'function') HighchartsMore(Highcharts)
 
-Highcharts.setOptions({
-  chart: { backgroundColor: 'transparent', style: { color: '#fff' } },
-  title: { style: { color: '#fff' } },
-  xAxis: {
-    labels: { style: { color: '#fff' } },
-    lineColor: '#fff',
-    tickColor: '#fff',
-    gridLineColor: '#444'
-  },
-  yAxis: {
-    labels: { style: { color: '#fff' } },
-    lineColor: '#fff',
-    tickColor: '#fff',
-    gridLineColor: '#444'
-  },
-  legend: { itemStyle: { color: '#fff' }, backgroundColor: 'transparent' },
-  tooltip: { backgroundColor: 'rgba(30,30,30,0.98)', style: { color: '#fff' } },
-  plotOptions: { series: { dataLabels: { color: '#fff' } } }
-})
+// Types for Metrics and ModalReport (adjust as needed to match your data)
+type MetricsRecord = {
+  period: string
+  platform: string
+  metrics: Record<string, number | string | undefined>
+}
+
+type PlatformInsight = {
+  name: string
+  metrics: { label: string; value: string | number }[]
+  observations: string[]
+}
+
+type ModalReport = {
+  companyName: string
+  period: string
+  overview: string
+  platforms: PlatformInsight[]
+  swot: {
+    strengths: string[]
+    weaknesses: string[]
+    opportunities: string[]
+    threats: string[]
+  }
+  recommendations: {
+    growth: string[]
+    engagement: string[]
+    conversions: string[]
+    content: string[]
+    monitor: string[]
+  }
+  conclusion: string
+  preparedBy: string
+}
 
 export default function ReportDashboard () {
-  // Analytics state
-  const [dateRange, setDateRange] = useState([
+  // --- State
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
     dayjs().startOf('month'),
     dayjs().endOf('month')
   ])
-  const [expandedChart, setExpandedChart] = useState(null)
+  const [expandedChart, setExpandedChart] = useState<HighchartsOptions | null>(
+    null
+  )
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [modalMonth, setModalMonth] = useState(null)
-  const reportRef = useRef()
+  const [modalMonth, setModalMonth] = useState<Dayjs | null>(null)
+  const reportRef = useRef<HTMLDivElement | null>(null)
   const { companyData, user } = useCompanyData()
-  const [metrics, setMetrics] = useState([])
+  const [metrics, setMetrics] = useState<MetricsRecord[]>([])
 
   // Modal AI state
   const {
@@ -82,36 +101,31 @@ export default function ReportDashboard () {
     generateInsights
   } = useAiInsights()
 
-  // Helper for fetching metrics if you want per month in modal
-  const [modalMetrics, setModalMetrics] = useState([])
+  // Helper for fetching metrics for modal
+  const [modalMetrics, setModalMetrics] = useState<MetricsRecord[]>([])
 
-  // Injects PDF mode styles on first render if not already present
-  if (typeof window !== 'undefined' && !document.getElementById('pdf-style')) {
-    const style = document.createElement('style')
-    style.id = 'pdf-style'
-    style.innerHTML = `
-      .pdf-mode, .pdf-mode * {
-        background: #fff !important;
-        color: #111 !important;
-        border-color: #222 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-    `
-    document.head.appendChild(style)
-  }
+  // PDF mode styles injection (should useEffect for SSR safety)
+  useEffect(() => {
+    if (
+      typeof window !== 'undefined' &&
+      !document.getElementById('pdf-style')
+    ) {
+      const style = document.createElement('style')
+      style.id = 'pdf-style'
+      style.innerHTML = `
+        .pdf-mode, .pdf-mode * {
+          background: #fff !important;
+          color: #111 !important;
+          border-color: #222 !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+      `
+      document.head.appendChild(style)
+    }
+  }, [])
 
-  function buildAIPayloadFromMetrics (metrics) {
-    return metrics.map(row => ({
-      name: row.platform.charAt(0).toUpperCase() + row.platform.slice(1),
-      metrics: Object.entries(row.metrics || {}).map(([label, value]) => ({
-        label: label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        value
-      }))
-    }))
-  }
-
-  // Fetch Firestore metrics for dashboard/range
+  // --- Firestore Data Fetching
   useEffect(() => {
     if (!user || !companyData?.id || !dateRange[0] || !dateRange[1]) {
       setMetrics([])
@@ -134,11 +148,11 @@ export default function ReportDashboard () {
         where('period', '<=', end)
       )
     ).then(snap => {
-      setMetrics(snap.docs.map(doc => doc.data()))
+      setMetrics(snap.docs.map(doc => doc.data() as MetricsRecord))
     })
   }, [user, companyData, dateRange])
 
-  // Fetch Firestore metrics for selected modal month
+  // Modal metrics (per month)
   useEffect(() => {
     if (!user || !companyData?.id || !modalMonth) {
       setModalMetrics([])
@@ -154,50 +168,52 @@ export default function ReportDashboard () {
       'metrics'
     )
     getDocs(query(metricsRef, where('period', '==', monthStr))).then(snap => {
-      setModalMetrics(snap.docs.map(doc => doc.data()))
+      setModalMetrics(snap.docs.map(doc => doc.data() as MetricsRecord))
     })
   }, [user, companyData, modalMonth])
 
-  // Aggregate values per platform (dashboard)
+  // --- Data Aggregation
   const agg = useMemo(() => {
-    const platforms = {}
+    const platforms: Record<string, Record<string, number>[]> = {}
     metrics.forEach(row => {
       const pf = row.platform?.toLowerCase()
       if (!platforms[pf]) platforms[pf] = []
-      platforms[pf].push(row.metrics || {})
+      platforms[pf].push((row.metrics || {}) as Record<string, number>)
     })
-    const getSum = (pf, field) =>
+    const getSum = (pf: string, field: string) =>
       (platforms[pf] || []).reduce((a, b) => a + (Number(b[field]) || 0), 0)
     return { platforms, getSum }
   }, [metrics])
 
-  // Handle modal open/close
+  // --- AI Payload Builder
+  function buildAIPayloadFromMetrics (metrics: MetricsRecord[]) {
+    return metrics.map(row => ({
+      name: row.platform.charAt(0).toUpperCase() + row.platform.slice(1),
+      metrics: Object.entries(row.metrics || {}).map(([label, value]) => ({
+        label: label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        value
+      }))
+    }))
+  }
+
+  // --- Modal handlers
   const openModal = () => {
     setIsModalOpen(true)
     setModalMonth(null)
-    // No AI call yet
   }
   const closeModal = () => setIsModalOpen(false)
-
-  // Only call generateInsights after selecting month and clicking button
   const handleGenerateReport = () => {
     if (!modalMonth) return
     const period = modalMonth.format('MMMM YYYY')
     const platforms = buildAIPayloadFromMetrics(modalMetrics)
-    console.log({
-      platforms,
-      companyName: companyData?.companyName || '',
-      period
-    })
-
     generateInsights({
-      platforms, // <-- match backend
+      platforms,
       companyName: companyData?.companyName || '',
       period
     })
   }
 
-  // PDF Download logic
+  // --- PDF Download
   const downloadPDF = () => {
     if (reportRef.current) {
       reportRef.current.classList.add('pdf-mode')
@@ -214,42 +230,18 @@ export default function ReportDashboard () {
           jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
         })
         .save()
-        .then(() => reportRef.current.classList.remove('pdf-mode'))
-        .catch(() => reportRef.current.classList.remove('pdf-mode'))
+        .then(
+          () =>
+            reportRef.current && reportRef.current.classList.remove('pdf-mode')
+        )
+        .catch(
+          () =>
+            reportRef.current && reportRef.current.classList.remove('pdf-mode')
+        )
     }
   }
 
-  function fixMarkdownTables (md) {
-    if (!md) return md
-    // Find all likely tables (lines with multiple pipes)
-    return md.replace(/((?:\|[^\n]+\|)+)/g, block => {
-      // Remove extra spaces
-      let cleaned = block
-        .replace(/\s*\|\s*/g, '|')
-        .replace(/^\|/, '')
-        .replace(/\|$/, '')
-      // Split at header, align, and break into rows of 2 (or more) columns
-      // Collapse duplicate pipes and remove empty segments
-      let parts = cleaned.split('|').filter(Boolean)
-      // Detect number of columns by counting first |...| after header
-      let numCols = 2
-      for (let i = 0; i < parts.length; i++) {
-        if (parts[i].match(/^-+$/)) {
-          numCols = i
-          break
-        }
-      }
-      if (numCols < 2) numCols = 2 // fallback
-      // Reassemble into lines
-      let out = ''
-      for (let i = 0; i < parts.length; i += numCols) {
-        out += '| ' + parts.slice(i, i + numCols).join(' | ') + ' |\n'
-      }
-      return out
-    })
-  }
-
-  // Summary values
+  // --- Metrics Summary
   const totalViews = ['google', 'facebook', 'instagram', 'tiktok', 'x'].reduce(
     (sum, pf) => sum + agg.getSum(pf, 'views'),
     0
@@ -264,7 +256,7 @@ export default function ReportDashboard () {
       ? `${((totalBookings / totalViews) * 100).toFixed(1)}%`
       : '--'
 
-  // Metric Cards (AntD Card + Typography)
+  // --- Visual Summary Cards
   const visualSummary = [
     {
       label: 'Total Views',
@@ -286,8 +278,8 @@ export default function ReportDashboard () {
     }
   ]
 
-  // Six Chart configs, using real data
-  const chartConfigs = [
+  // --- Chart Configs (typed)
+  const chartConfigs: HighchartsOptions[] = [
     // 1. Platform Metrics with View Trends
     {
       chart: { zoomType: 'xy' },
@@ -489,13 +481,15 @@ export default function ReportDashboard () {
       ]
     }
   ]
+
+  // --- Render
   return (
     <Box style={{ minHeight: '100vh', padding: 32, background: '#191A1F' }}>
       <Flex justify='flex-end' align='center' mb={6} style={{ gap: 16 }}>
         <RangePicker
           picker='month'
           value={dateRange}
-          onChange={dates => setDateRange(dates)}
+          onChange={dates => dates && setDateRange(dates as [Dayjs, Dayjs])}
           style={{
             background: '#2a2a2e',
             padding: '6px',
@@ -507,8 +501,6 @@ export default function ReportDashboard () {
           Generate Report
         </Button>
       </Flex>
-
-      {/* Metrics Summary */}
       <Row gutter={16} style={{ marginBottom: 32, marginTop: 20 }}>
         {visualSummary.map(({ label, value, color, icon }, idx) => (
           <Col xs={24} sm={8} key={idx}>
@@ -532,8 +524,6 @@ export default function ReportDashboard () {
           </Col>
         ))}
       </Row>
-
-      {/* Charts Grid (two per row) */}
       <div ref={reportRef}>
         <Row gutter={[24, 24]}>
           {chartConfigs.map((config, idx) => (
@@ -552,9 +542,7 @@ export default function ReportDashboard () {
                 extra={
                   <Button
                     size='small'
-                    onClick={() =>
-                      setExpandedChart(JSON.parse(JSON.stringify(config)))
-                    }
+                    onClick={() => setExpandedChart({ ...config })}
                   >
                     Expand <MotionIcon style={{ marginLeft: 4 }} />
                   </Button>
@@ -567,8 +555,6 @@ export default function ReportDashboard () {
           ))}
         </Row>
       </div>
-
-      {/* Expand Chart Modal */}
       <Modal
         open={!!expandedChart}
         onCancel={() => setExpandedChart(null)}
@@ -579,9 +565,6 @@ export default function ReportDashboard () {
           <HighchartsReact highcharts={Highcharts} options={expandedChart} />
         )}
       </Modal>
-
-      {/* PDF/Executive Modal */}
-      {/* MODAL for AI report */}
       <Modal
         title={
           <div>
@@ -599,7 +582,6 @@ export default function ReportDashboard () {
         width='700px'
         destroyOnClose
       >
-        {/* Month selector and trigger */}
         <div
           style={{
             display: 'flex',
@@ -628,8 +610,6 @@ export default function ReportDashboard () {
             Generate Report
           </Button>
         </div>
-
-        {/* Display result or error */}
         {modalLoading && <Spin tip='Generating report...' />}
         {modalError && (
           <Alert

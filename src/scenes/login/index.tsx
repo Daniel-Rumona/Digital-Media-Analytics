@@ -23,10 +23,17 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  User
 } from 'firebase/auth'
 import { auth, db } from '@/firebase/firebase'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  DocumentData
+} from 'firebase/firestore'
 import { message, Spin } from 'antd'
 
 const MotionBox = motion(Box)
@@ -36,23 +43,22 @@ export const BackButton = () => (
     as={RouterLink}
     to='/'
     size='xs'
-    colorPalette='teal'
+    colorScheme='teal'
     variant='ghost'
     rounded='full'
     _hover={{ transform: 'translateY(-1px)', boxShadow: 'lg' }}
     _active={{ transform: 'translateY(0)' }}
+    leftIcon={<FiArrowLeft />}
   >
-    <FiArrowLeft />
+    Back
   </Button>
 )
 
-const Field = ({
-  label,
-  children
-}: {
+interface FieldProps {
   label: string
   children: React.ReactNode
-}) => {
+}
+const Field = ({ label, children }: FieldProps) => {
   const textColor = useColorModeValue('gray.100', 'gray.100')
   return (
     <Box>
@@ -64,19 +70,20 @@ const Field = ({
   )
 }
 
+interface PasswordFieldProps {
+  label: string
+  placeholder: string
+  value: string
+  onChange: (v: string) => void
+  isDisabled?: boolean
+}
 const PasswordField = ({
   label,
   placeholder,
   value,
   onChange,
   isDisabled = false
-}: {
-  label: string
-  placeholder: string
-  value: string
-  onChange: (v: string) => void
-  isDisabled?: boolean
-}) => {
+}: PasswordFieldProps) => {
   const [show, setShow] = useState(false)
   const textColor = useColorModeValue('gray.100', 'gray.100')
 
@@ -98,13 +105,12 @@ const PasswordField = ({
         <IconButton
           aria-label='Toggle visibility'
           bg='transparent'
-          colorPalette='teal'
+          colorScheme='teal'
           _hover={{ bg: 'transparent' }}
           onClick={() => setShow(!show)}
           isDisabled={isDisabled}
-        >
-          {show ? <FiEyeOff /> : <FiEye />}
-        </IconButton>
+          icon={show ? <FiEyeOff /> : <FiEye />}
+        />
       </HStack>
       <Text
         mt={1}
@@ -128,7 +134,10 @@ const LoginPage = () => {
   const navigate = useNavigate()
 
   // Fetch user profile, create if missing
-  const fetchOrCreateUserProfile = async (uid: string, authUser: any) => {
+  const fetchOrCreateUserProfile = async (
+    uid: string,
+    authUser: User
+  ): Promise<DocumentData> => {
     const userRef = doc(db, 'users', uid)
     const userSnap = await getDoc(userRef)
     if (userSnap.exists()) {
@@ -145,7 +154,7 @@ const LoginPage = () => {
     }
   }
 
-  const handleLogin = async () => {
+  const handleLogin = async (): Promise<void> => {
     setLoading(true)
     try {
       const res = await signInWithEmailAndPassword(auth, email, password)
@@ -159,7 +168,7 @@ const LoginPage = () => {
     setLoading(false)
   }
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = async (): Promise<void> => {
     setLoading(true)
     try {
       const provider = new GoogleAuthProvider()
@@ -261,17 +270,17 @@ const LoginPage = () => {
             isDisabled={loading}
           />
 
-          <ButtonGroup grow size='sm' variant='outline'>
+          <ButtonGroup width='100%' size='sm' variant='outline' spacing={2}>
             <Button
               size='lg'
-              variant='surface'
-              colorPalette={'cyan'}
+              variant='outline'
+              colorScheme='cyan'
               rounded='full'
               mt={2}
               _hover={{ transform: 'translateY(-2px)' }}
               onClick={handleLogin}
-              loading={loading}
-              disabled={!email || !password || loading}
+              isLoading={loading}
+              isDisabled={!email || !password || loading}
             >
               Login
             </Button>
@@ -282,15 +291,15 @@ const LoginPage = () => {
               rounded='full'
               mt={2}
               onClick={handleGoogleLogin}
-              loading={loading}
-              disabled={loading}
+              isLoading={loading}
+              isDisabled={loading}
             >
               Sign in with Google
             </Button>
           </ButtonGroup>
           <Text style={{ marginTop: 5, textAlign: 'center' }}>
             Don&apos;t have an account?{' '}
-            <Link as={RouterLink} to='/register' colorPalette='teal'>
+            <Link as={RouterLink} to='/register' color='teal.400'>
               Register
             </Link>
           </Text>

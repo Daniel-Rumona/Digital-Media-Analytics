@@ -1,16 +1,27 @@
-import { Drawer, Tabs, Form, Input, Button } from 'antd'
+import { Drawer, Tabs, Form, Input, Button, message } from 'antd'
 import { updateEmail, updatePassword } from 'firebase/auth'
 import { auth } from '@/firebase/firebase'
-import { message } from 'antd'
 import { useState } from 'react'
 
-const AccountDrawer = ({ open, onClose, tab, setTab }) => {
+type AccountDrawerProps = {
+  open: boolean
+  onClose: () => void
+  tab: string
+  setTab: (tab: string) => void
+}
+
+const AccountDrawer: React.FC<AccountDrawerProps> = ({
+  open,
+  onClose,
+  tab,
+  setTab
+}) => {
   const [form] = Form.useForm()
   const [pwForm] = Form.useForm()
   const [loading, setLoading] = useState(false)
 
   // Change Email
-  const handleEmailChange = async values => {
+  const handleEmailChange = async (values: { email: string }) => {
     setLoading(true)
     try {
       if (auth.currentUser) {
@@ -18,14 +29,14 @@ const AccountDrawer = ({ open, onClose, tab, setTab }) => {
         message.success('Email updated!')
       }
       form.resetFields()
-    } catch (err) {
+    } catch (err: any) {
       message.error(err.message)
     }
     setLoading(false)
   }
 
   // Change Password
-  const handlePasswordChange = async values => {
+  const handlePasswordChange = async (values: { password: string }) => {
     setLoading(true)
     try {
       if (auth.currentUser) {
@@ -33,7 +44,7 @@ const AccountDrawer = ({ open, onClose, tab, setTab }) => {
         message.success('Password updated!')
       }
       pwForm.resetFields()
-    } catch (err) {
+    } catch (err: any) {
       message.error(err.message)
     }
     setLoading(false)
@@ -108,7 +119,7 @@ const AccountDrawer = ({ open, onClose, tab, setTab }) => {
                   rules={[
                     { required: true, message: 'Confirm your password' },
                     ({ getFieldValue }) => ({
-                      validator (_, value) {
+                      validator (_: any, value: string) {
                         if (!value || getFieldValue('password') === value) {
                           return Promise.resolve()
                         }

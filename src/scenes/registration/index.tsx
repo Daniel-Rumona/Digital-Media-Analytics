@@ -38,28 +38,11 @@ import { message, Spin } from 'antd'
 
 const MotionBox = motion(Box)
 
-export const BackButton = () => (
-  <Button
-    as={RouterLink}
-    to='/'
-    size='xs'
-    colorPalette='teal'
-    variant='ghost'
-    rounded='full'
-    _hover={{ transform: 'translateY(-1px)', boxShadow: 'lg' }}
-    _active={{ transform: 'translateY(0)' }}
-  >
-    <FiArrowLeft />
-  </Button>
-)
-
-const Field = ({
-  label,
-  children
-}: {
+interface FieldProps {
   label: string
   children: React.ReactNode
-}) => {
+}
+const Field = ({ label, children }: FieldProps) => {
   const textColor = useColorModeValue('gray.100', 'gray.100')
   return (
     <Box>
@@ -71,19 +54,20 @@ const Field = ({
   )
 }
 
+interface PasswordFieldProps {
+  label: string
+  placeholder: string
+  value: string
+  onChange: (v: string) => void
+  isDisabled?: boolean
+}
 const PasswordField = ({
   label,
   placeholder,
   value,
   onChange,
   isDisabled = false
-}: {
-  label: string
-  placeholder: string
-  value: string
-  onChange: (v: string) => void
-  isDisabled?: boolean
-}) => {
+}: PasswordFieldProps) => {
   const [show, setShow] = useState(false)
   const textColor = useColorModeValue('gray.100', 'gray.100')
 
@@ -105,13 +89,12 @@ const PasswordField = ({
         <IconButton
           aria-label='Toggle visibility'
           bg='transparent'
-          colorPalette='teal'
+          colorScheme='teal'
           _hover={{ bg: 'transparent' }}
           onClick={() => setShow(!show)}
           isDisabled={isDisabled}
-        >
-          {show ? <FiEyeOff /> : <FiEye />}
-        </IconButton>
+          icon={show ? <FiEyeOff /> : <FiEye />}
+        />
       </HStack>
       <Text
         mt={1}
@@ -127,6 +110,22 @@ const PasswordField = ({
   )
 }
 
+export const BackButton = () => (
+  <Button
+    as={RouterLink}
+    to='/'
+    size='xs'
+    colorScheme='teal'
+    variant='ghost'
+    rounded='full'
+    _hover={{ transform: 'translateY(-1px)', boxShadow: 'lg' }}
+    _active={{ transform: 'translateY(0)' }}
+    leftIcon={<FiArrowLeft />}
+  >
+    Back
+  </Button>
+)
+
 const RegistrationPage = () => {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -139,7 +138,7 @@ const RegistrationPage = () => {
   const navigate = useNavigate()
 
   // Email/Password Registration
-  const handleRegister = async () => {
+  const handleRegister = async (): Promise<void> => {
     if (password !== confirmPassword) {
       message.error('Passwords do not match')
       return
@@ -147,7 +146,6 @@ const RegistrationPage = () => {
     setLoading(true)
     try {
       const res = await createUserWithEmailAndPassword(auth, email, password)
-      // Save user profile to Firestore
       await setDoc(doc(db, 'users', res.user.uid), {
         fullName,
         email,
@@ -163,13 +161,11 @@ const RegistrationPage = () => {
   }
 
   // Google Registration
-  const handleGoogleRegister = async () => {
+  const handleGoogleRegister = async (): Promise<void> => {
     setLoading(true)
     try {
       const provider = new GoogleAuthProvider()
       const res = await signInWithPopup(auth, provider)
-      // If it's a new user, prompt for fullName
-      // (You may want to collect/display a modal for full name in a real-world app)
       await setDoc(
         doc(db, 'users', res.user.uid),
         {
@@ -214,7 +210,6 @@ const RegistrationPage = () => {
       position='relative'
       px={4}
     >
-      {/* Spinner Overlay */}
       {loading && (
         <Box
           position='fixed'
@@ -229,7 +224,6 @@ const RegistrationPage = () => {
         </Box>
       )}
 
-      {/* Logo */}
       <Image
         src={QuantO}
         alt='Steij'
@@ -307,20 +301,21 @@ const RegistrationPage = () => {
             isDisabled={loading}
           />
 
-          <ButtonGroup grow size='sm' variant='outline'>
+          <ButtonGroup width='100%' size='sm' variant='outline' spacing={2}>
             <Button
               size='lg'
-              variant='surface'
-              colorPalette={'cyan'}
+              variant='outline'
+              colorScheme='cyan'
               rounded='full'
               mt={2}
               _hover={{ transform: 'translateY(-2px)' }}
               onClick={handleRegister}
-              loading={loading}
+              isLoading={loading}
               loadingText='Registering'
-              disabled={!canRegister}
+              isDisabled={!canRegister}
+              leftIcon={<FiUserPlus />}
             >
-              Register <FiUserPlus />
+              Register
             </Button>
             <Button
               size='lg'
@@ -329,16 +324,16 @@ const RegistrationPage = () => {
               rounded='full'
               mt={2}
               onClick={handleGoogleRegister}
-              loading={loading}
+              isLoading={loading}
               loadingText='Registering'
-              disabled={loading}
+              isDisabled={loading}
             >
               Sign up with Google
             </Button>
           </ButtonGroup>
           <Text style={{ marginTop: 5, textAlign: 'center' }}>
-            Already have an account ?
-            <Link as={RouterLink} to='/login' colorPalette='teal'>
+            Already have an account?{' '}
+            <Link as={RouterLink} to='/login' color='teal.400'>
               Login
             </Link>
           </Text>

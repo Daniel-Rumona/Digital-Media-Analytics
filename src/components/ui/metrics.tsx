@@ -11,9 +11,16 @@ import {
   Row
 } from 'antd'
 import { db } from '@/firebase/firebase'
-import { collection, getDocs, addDoc, doc } from 'firebase/firestore'
-import dayjs from 'dayjs'
+import { collection, getDocs, addDoc, DocumentData } from 'firebase/firestore'
+import dayjs, { Dayjs } from 'dayjs'
 
+type PlatformKey = keyof typeof PLATFORM_METRICS
+
+type PlatformMetric = {
+  [key in PlatformKey]: string[]
+}
+
+// Define metrics per platform
 const PLATFORM_METRICS = {
   google: [
     'rating',
@@ -54,14 +61,44 @@ const PLATFORM_METRICS = {
     'shares'
   ],
   x: ['new follows', 'posts', 'views', 'likes', 'shares']
+} as const
+
+interface Company {
+  id: string
+  companyName: string
+  accounts?: { platform: string }[]
 }
 
-const CompanyMetricsSetupModal = ({ open, onCancel, userId }) => {
-  const [form] = Form.useForm()
-  const [loading, setLoading] = useState(true)
-  const [companies, setCompanies] = useState([])
-  const [platforms, setPlatforms] = useState([])
-  const [metricFields, setMetricFields] = useState([])
+interface CompanyMetricsSetupModalProps {
+  open: boolean
+  onCancel: () => void
+  userId: string
+}
+
+// Form value shapes
+interface MetricsFormShape {
+  [metric: string]: number | undefined
+}
+
+interface FormValues {
+  company: string
+  platform: string
+  date: Dayjs
+  metrics: MetricsFormShape
+}
+
+const CompanyMetricsSetupModal: React.FC<CompanyMetricsSetupModalProps> = ({
+  open,
+  onCancel,
+  userId
+}) => {
+  const [form] = Form.useForm<FormValues>()
+  const [loading, setLoading] = useState<boolean>(true)
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [platforms, setPlatforms] = useState<
+    { label: string; value: string }[]
+  >([])
+  const [metricFields, setMetricFields] = useState<string[]>([])
 
   // Fetch all companies on open
   useEffect(() => {
@@ -71,16 +108,18 @@ const CompanyMetricsSetupModal = ({ open, onCancel, userId }) => {
       const snap = await getDocs(collection(db, 'users', userId, 'companies'))
       const companyArr = snap.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...(doc.data() as Omit<Company, 'id'>)
       }))
       setCompanies(companyArr)
       setLoading(false)
     })()
   }, [open, userId])
-  
 
   // When company changes, update platform dropdown
-  const handleFormValuesChange = (changedValues, allValues) => {
+  const handleFormValuesChange = (
+    changedValues: Partial<FormValues>,
+    allValues: FormValues
+  ) => {
     if ('company' in changedValues) {
       const selectedCompany = changedValues.company
       const company = companies.find(c => c.id === selectedCompany)
@@ -89,39 +128,46 @@ const CompanyMetricsSetupModal = ({ open, onCancel, userId }) => {
           ? company.accounts.map(acc => ({
               label:
                 acc.platform.charAt(0).toUpperCase() + acc.platform.slice(1),
-              value: acc.platform.toLowerCase() // ensure key matches mapping!
+              value: acc.platform.toLowerCase()
             }))
           : []
       )
       // Reset fields
-      form.setFieldsValue({ platform: undefined, metrics: {}, date: undefined })
+      form.setFieldsValue({
+        platform: undefined,
+        metrics: {},
+        date: undefined
+      } as any)
       setMetricFields([])
     }
     if ('platform' in changedValues) {
       const selectedPlatform = changedValues.platform
-      const metrics = PLATFORM_METRICS[selectedPlatform?.toLowerCase?.()] || []
+      // Only set metrics if valid
+      const metrics =
+        selectedPlatform && PLATFORM_METRICS[selectedPlatform as PlatformKey]
+          ? PLATFORM_METRICS[selectedPlatform as PlatformKey]
+          : []
       setMetricFields(metrics)
       // Reset metric values
-      const emptyMetrics = {}
+      const emptyMetrics: MetricsFormShape = {}
       metrics.forEach(m => {
         emptyMetrics[m] = undefined
       })
-      form.setFieldsValue({ metrics: emptyMetrics })
+      form.setFieldsValue({ metrics: emptyMetrics } as any)
     }
   }
 
-  const onFinish = async values => {
+  const onFinish = async (values: FormValues) => {
     const { company, platform, date, metrics } = values
     try {
       const companyObj = companies.find(c => c.id === company)
       if (!companyObj) throw new Error('Company not found')
-      // Save metrics to a subcollection for this company, by month+platform
       await addDoc(
         collection(db, 'users', userId, 'companies', company, 'metrics'),
         {
           platform,
           metrics,
-          period: dayjs(date).format('YYYY-MM'), // "2024-06"
+          period: dayjs(date).format('YYYY-MM'),
           createdAt: new Date()
         }
       )
@@ -129,8 +175,10 @@ const CompanyMetricsSetupModal = ({ open, onCancel, userId }) => {
       form.resetFields()
       setMetricFields([])
       onCancel()
-    } catch (err) {
-      message.error('Error saving metrics: ' + err.message)
+    } catch (err: any) {
+      message.error(
+        'Error saving metrics: ' + (err?.message ?? 'Unknown error')
+      )
     }
   }
 
@@ -146,7 +194,7 @@ const CompanyMetricsSetupModal = ({ open, onCancel, userId }) => {
       {loading ? (
         <Spin />
       ) : (
-        <Form
+        <Form<FormValues>
           form={form}
           layout='vertical'
           onFinish={onFinish}
@@ -191,7 +239,6 @@ const CompanyMetricsSetupModal = ({ open, onCancel, userId }) => {
             <Form.Item label='Enter Metrics'>
               <Row gutter={16}>
                 {metricFields.map((metric, idx) => {
-                  // Last metric AND odd count? Span both columns.
                   const isLast = idx === metricFields.length - 1
                   const isOdd = metricFields.length % 2 === 1
                   const spanProps =
@@ -202,7 +249,10 @@ const CompanyMetricsSetupModal = ({ open, onCancel, userId }) => {
                         name={['metrics', metric]}
                         label={metric.charAt(0).toUpperCase() + metric.slice(1)}
                         rules={[
-                          { required: true, message: `Please enter ${metric}` }
+                          {
+                            required: true,
+                            message: `Please enter ${metric}`
+                          }
                         ]}
                         style={{ marginBottom: 8 }}
                       >
