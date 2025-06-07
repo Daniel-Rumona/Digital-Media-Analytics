@@ -1,16 +1,17 @@
-import React, { useState, FC } from 'react'
+import { useState } from 'react'
+import type { FC } from 'react'
 import { Row, Col, Card, Modal, Button } from 'antd'
-import Highcharts, { Options, Chart } from 'highcharts'
+import Highcharts, { Chart } from 'highcharts'
+import type { Options } from 'highcharts'
 import HighchartsReact from 'highcharts-react-official'
 import wordcloud from 'highcharts/modules/wordcloud'
 import solidGauge from 'highcharts/modules/solid-gauge'
 import { ExpandOutlined } from '@ant-design/icons'
 
-// TypeScript module augmentation for Highcharts
-if (typeof Highcharts === 'object') {
-  wordcloud(Highcharts)
-  solidGauge(Highcharts)
-}
+if (typeof Highcharts === 'function') {
+    wordcloud(Highcharts)
+    solidGauge(Highcharts)
+  }
 
 // --- Types
 type SentimentPoint = { name: string; y: number; color: string }
