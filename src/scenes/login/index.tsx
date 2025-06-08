@@ -27,8 +27,8 @@ import {
 } from 'firebase/auth'
 import type { User } from 'firebase/auth'
 import { auth, db } from '@/firebase/firebase'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import type { DocumentData } from 'firebase/firestore'
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { message, Spin } from 'antd'
 
 const MotionBox = motion(Box)
@@ -265,7 +265,7 @@ const LoginPage = () => {
           />
 
           <ButtonGroup width='100%' size='sm' variant='outline' spacing={2}>
-             <Button
+            <Button
               size='lg'
               variant='surface'
               colorPalette={'cyan'}

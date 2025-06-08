@@ -144,54 +144,37 @@ const Sidebar: React.FC<SidebarProps> = ({
           size='sm'
           onClick={onToggle}
           variant='ghost'
-          colorScheme='whiteAlpha'
-          icon={<FiMenu />}
-        />
+          colorScheme='white'
+        >
+          <FiMenu style={{ color: '#fff' }} />
+        </IconButton>
       </Flex>
 
       <Divider style={{ borderColor: '#4A5568', marginBottom: '16px' }} />
 
       <VStack spacing={4} align='stretch'>
-        {SidebarItems.map(item =>
-          item.label === 'Metrics Tracker' ? (
-            <HStack
-              as='button'
-              key={item.label}
-              _hover={{ bg: 'gray.700' }}
-              bg={location.pathname === item.path ? 'gray.700' : 'transparent'}
-              p={2}
-              borderRadius='md'
-              cursor='pointer'
-              spacing={collapsed ? 0 : 3}
-              justify={collapsed ? 'center' : 'flex-start'}
-              onClick={onOpenCompanyModal}
-            >
-              <item.icon />
-              {!collapsed && <Text>{item.label}</Text>}
-            </HStack>
-          ) : (
-            <NavLink
-              key={item.label}
-              to={item.path}
-              style={{ textDecoration: 'none' }}
-            >
-              {({ isActive }) => (
-                <HStack
-                  _hover={{ bg: 'gray.700' }}
-                  bg={isActive ? 'gray.700' : 'transparent'}
-                  p={2}
-                  borderRadius='md'
-                  cursor='pointer'
-                  spacing={collapsed ? 0 : 3}
-                  justify={collapsed ? 'center' : 'flex-start'}
-                >
-                  <item.icon />
-                  {!collapsed && <Text>{item.label}</Text>}
-                </HStack>
-              )}
-            </NavLink>
-          )
-        )}
+        {SidebarItems.map(item => (
+          <NavLink
+            key={item.label}
+            to={item.path}
+            style={{ textDecoration: 'none' }}
+          >
+            {({ isActive }) => (
+              <HStack
+                _hover={{ bg: 'gray.700' }}
+                bg={isActive ? 'gray.700' : 'transparent'}
+                p={2}
+                borderRadius='md'
+                cursor='pointer'
+                spacing={collapsed ? 0 : 3}
+                justify={collapsed ? 'center' : 'flex-start'}
+              >
+                <item.icon />
+                {!collapsed && <Text>{item.label}</Text>}
+              </HStack>
+            )}
+          </NavLink>
+        ))}
       </VStack>
     </Box>
   )
