@@ -9,6 +9,7 @@ import PlatformAnalysis from './scenes/platforms'
 import SentimentAnalysis from './scenes/sentiment-analysis'
 import CompaniesTable from './scenes/companies'
 import CompanyMetricsManager from './scenes/metrics'
+import PostAnalysis from './scenes/post-analysis'
 
 function App () {
   return (
@@ -46,6 +47,14 @@ function App () {
           element={
             <Layout>
               <CompanyMetricsManager />
+            </Layout>
+          }
+        />
+        <Route
+          path='/post-analysis'
+          element={
+            <Layout>
+              <PostAnalysis />
             </Layout>
           }
         />
