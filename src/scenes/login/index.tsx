@@ -16,7 +16,6 @@ import {
   ButtonGroup
 } from '@chakra-ui/react'
 import { useColorModeValue } from '@/components/ui/color-mode'
-import QuantO from '../../assets/images/QuantilytixO.png'
 import { FiEye, FiEyeOff, FiLock, FiArrowLeft } from 'react-icons/fi'
 import { motion } from 'framer-motion'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
@@ -203,18 +202,6 @@ const LoginPage = () => {
           <Spin size='large' tip='Logging in...' />
         </Box>
       )}
-
-      {/* Logo */}
-      <Image
-        src={QuantO}
-        alt='Steij'
-        position='absolute'
-        bottom={4}
-        right={4}
-        w={150}
-        opacity={0.7}
-        pointerEvents='none'
-      />
 
       <MotionBox
         w={{ base: 'full', md: '480px' }}
