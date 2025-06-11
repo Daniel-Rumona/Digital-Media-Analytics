@@ -16,7 +16,6 @@ import {
   ButtonGroup
 } from '@chakra-ui/react'
 import { useColorModeValue } from '@/components/ui/color-mode'
-import QuantO from '../../assets/images/QuantilytixO.png'
 import {
   FiEye,
   FiEyeOff,
@@ -223,18 +222,6 @@ const RegistrationPage = () => {
           <Spin size='large' tip='Creating account...' />
         </Box>
       )}
-
-      <Image
-        src={QuantO}
-        alt='Steij'
-        position='absolute'
-        bottom={4}
-        right={4}
-        w={150}
-        opacity={0.7}
-        pointerEvents='none'
-      />
-
       <MotionBox
         w={{ base: 'full', md: '480px' }}
         bg={cardBg}
