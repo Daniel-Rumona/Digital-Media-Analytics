@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo, createRef } from 'react'
 import {
   Row,
   Col,
@@ -25,25 +25,38 @@ import type { Options as HighchartsOptions } from 'highcharts'
 import HighchartsReact from 'highcharts-react-official'
 import HighchartsMore from 'highcharts/highcharts-more'
 import HighchartsFunnel from 'highcharts/modules/funnel'
-import html2pdf from 'html2pdf.js'
-import dayjs, { Dayjs } from 'dayjs'
 import { motion } from 'framer-motion'
 import { useCompanyData } from '@/context/company-data-context'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '@/firebase/firebase'
 import { Box } from '@chakra-ui/react'
 import useAiInsights from './useAIInsight'
-import ReactMarkdown from 'react-markdown'
+import {
+  Document,
+  Packer,
+  Paragraph,
+  HeadingLevel,
+  Table,
+  TableRow,
+  TableCell,
+  Media,
+  ImageRun
+} from 'docx'
+import { saveAs } from 'file-saver'
+import dayjs, { Dayjs } from 'dayjs'
+import HighchartsExporting from 'highcharts/modules/exporting'
+import HighchartsOfflineExporting from 'highcharts/modules/offline-exporting'
 
 const { RangePicker, MonthPicker } = DatePicker
-const { Text, Title, Paragraph } = Typography
+const { Text, Title, Paragraph: AntParagraph } = Typography
 const MotionIcon = motion(FiMaximize2)
 
-// For Highcharts modules
 if (typeof HighchartsFunnel === 'function') HighchartsFunnel(Highcharts)
 if (typeof HighchartsMore === 'function') HighchartsMore(Highcharts)
+if (typeof HighchartsExporting === 'function') HighchartsExporting(Highcharts)
+if (typeof HighchartsOfflineExporting === 'function')
+  HighchartsOfflineExporting(Highcharts)
 
-// Types for Metrics and ModalReport (adjust as needed to match your data)
 type MetricsRecord = {
   period: string
   platform: string
@@ -60,7 +73,9 @@ type ModalReport = {
   companyName: string
   period: string
   overview: string
+  consolidatedChartObservations: string[]
   platforms: PlatformInsight[]
+  googleFunnelObservations: string[]
   swot: {
     strengths: string[]
     weaknesses: string[]
@@ -78,8 +93,254 @@ type ModalReport = {
   preparedBy: string
 }
 
+// Chart refs
+const consolidatedChartRef = createRef<any>()
+const funnelChartRef = createRef<any>()
+
+function computeMovingAverage (arr: any[], key: string) {
+  return arr.map((row, idx, arr) => {
+    if (idx < 2) return ''
+    const vals = [arr[idx][key], arr[idx - 1][key], arr[idx - 2][key]]
+    const nums = vals.map(Number).filter(n => !isNaN(n))
+    if (nums.length < 3) return ''
+    return (nums.reduce((a, b) => a + b, 0) / 3).toFixed(2)
+  })
+}
+
+function base64ToArrayBuffer (dataUrl: string) {
+  const base64 = dataUrl.split(',')[1]
+  const binary = atob(base64)
+  const len = binary.length
+  const bytes = new Uint8Array(len)
+  for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes.buffer
+}
+
+// --- THE KEY FIX: SVG to PNG as DataURL ---
+async function chartRefToPngDataUrl (chartRef) {
+  return new Promise<string>((resolve, reject) => {
+    if (
+      chartRef?.current &&
+      chartRef.current.chart &&
+      typeof chartRef.current.chart.getSVGForExport === 'function'
+    ) {
+      const svg = chartRef.current.chart.getSVGForExport()
+      const img = new window.Image()
+      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })
+      const url = URL.createObjectURL(svgBlob)
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        const dataUrl = canvas.toDataURL('image/png')
+        URL.revokeObjectURL(url)
+        resolve(dataUrl)
+      }
+      img.onerror = err => {
+        URL.revokeObjectURL(url)
+        reject(err)
+      }
+      img.src = url
+    } else {
+      reject(new Error('Chart not ready'))
+    }
+  })
+}
+
+// --- DOCX EXPORT (async) ---
+async function exportReportToWord (
+  modalReport,
+  platformMetricsHistory,
+  consolidatedChartRef,
+  funnelChartRef
+) {
+  // Use new SVG to PNG for both charts
+  const consolidatedDataUrl = await chartRefToPngDataUrl(consolidatedChartRef)
+  const funnelDataUrl = await chartRefToPngDataUrl(funnelChartRef)
+
+  if (
+    !consolidatedDataUrl ||
+    !consolidatedDataUrl.startsWith('data:image/png')
+  ) {
+    alert('Consolidated chart image not ready.')
+    return
+  }
+  if (!funnelDataUrl || !funnelDataUrl.startsWith('data:image/png')) {
+    alert('Funnel chart image not ready.')
+    return
+  }
+
+  const consolidatedImg = base64ToArrayBuffer(consolidatedDataUrl)
+  const funnelImg = base64ToArrayBuffer(funnelDataUrl)
+  const doc = new Document({ sections: [] })
+
+  const children = [
+    new Paragraph({
+      text: `${modalReport.companyName} — Social Media Report`,
+      heading: HeadingLevel.HEADING_1
+    }),
+    new Paragraph({
+      text: modalReport.period,
+      heading: HeadingLevel.HEADING_2
+    }),
+    new Paragraph({ text: modalReport.overview }),
+    new Paragraph({
+      text: 'Platform Metrics View Chart',
+      heading: HeadingLevel.HEADING_2
+    }),
+    new Paragraph({
+      children: [
+        new ImageRun({
+          data: consolidatedImg,
+          transformation: { width: 600, height: 300 }
+        })
+      ]
+    }),
+    new Paragraph({
+      text: 'Platform Metrics View Observations',
+      heading: HeadingLevel.HEADING_3
+    }),
+    ...(modalReport.consolidatedChartObservations || []).map(
+      o => new Paragraph({ text: `- ${o}` })
+    ),
+    ...modalReport.platforms.flatMap(platform => [
+      new Paragraph({
+        text: platform.name,
+        heading: HeadingLevel.HEADING_2
+      }),
+      ...(platform.name === 'Google'
+        ? [
+            new Paragraph({
+              text: 'Google Funnel Chart',
+              heading: HeadingLevel.HEADING_3
+            }),
+            new Paragraph({
+              children: [
+                new ImageRun({
+                  data: funnelImg,
+                  transformation: { width: 500, height: 220 }
+                })
+              ]
+            }),
+            new Paragraph({
+              text: 'Google Funnel Observations',
+              heading: HeadingLevel.HEADING_3
+            }),
+            ...(modalReport.googleFunnelObservations || []).map(
+              o => new Paragraph({ text: `- ${o}` })
+            )
+          ]
+        : []),
+      new Paragraph({
+        text: 'Key Observations',
+        heading: HeadingLevel.HEADING_3
+      }),
+      ...(platform.observations || []).map(
+        o => new Paragraph({ text: `- ${o}` })
+      ),
+      new Paragraph({
+        text: 'Metrics',
+        heading: HeadingLevel.HEADING_3
+      }),
+      new Table({
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({ children: [new Paragraph('Metric')] }),
+              new TableCell({ children: [new Paragraph('Value')] }),
+              new TableCell({ children: [new Paragraph('3-Point MA')] })
+            ]
+          }),
+          ...(platform.metrics || []).map(
+            (m, idx) =>
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph(String(m.label))]
+                  }),
+                  new TableCell({
+                    children: [new Paragraph(String(m.value))]
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph(
+                        String(
+                          computeMovingAverage(
+                            platformMetricsHistory[platform.name] || [],
+                            m.label
+                          )[idx] ?? ''
+                        )
+                      )
+                    ]
+                  })
+                ]
+              })
+          )
+        ]
+      })
+    ]),
+    new Paragraph({
+      text: 'SWOT Analysis',
+      heading: HeadingLevel.HEADING_2
+    }),
+    new Paragraph({ text: 'Strengths', heading: HeadingLevel.HEADING_3 }),
+    ...(modalReport.swot.strengths || []).map(
+      s => new Paragraph({ text: `- ${s}` })
+    ),
+    new Paragraph({ text: 'Weaknesses', heading: HeadingLevel.HEADING_3 }),
+    ...(modalReport.swot.weaknesses || []).map(
+      s => new Paragraph({ text: `- ${s}` })
+    ),
+    new Paragraph({ text: 'Opportunities', heading: HeadingLevel.HEADING_3 }),
+    ...(modalReport.swot.opportunities || []).map(
+      s => new Paragraph({ text: `- ${s}` })
+    ),
+    new Paragraph({ text: 'Threats', heading: HeadingLevel.HEADING_3 }),
+    ...(modalReport.swot.threats || []).map(
+      s => new Paragraph({ text: `- ${s}` })
+    ),
+    new Paragraph({
+      text: 'Recommendations',
+      heading: HeadingLevel.HEADING_2
+    }),
+    new Paragraph({ text: 'Growth', heading: HeadingLevel.HEADING_3 }),
+    ...(modalReport.recommendations.growth || []).map(
+      r => new Paragraph({ text: `- ${r}` })
+    ),
+    new Paragraph({ text: 'Engagement', heading: HeadingLevel.HEADING_3 }),
+    ...(modalReport.recommendations.engagement || []).map(
+      r => new Paragraph({ text: `- ${r}` })
+    ),
+    new Paragraph({ text: 'Conversions', heading: HeadingLevel.HEADING_3 }),
+    ...(modalReport.recommendations.conversions || []).map(
+      r => new Paragraph({ text: `- ${r}` })
+    ),
+    new Paragraph({ text: 'Content', heading: HeadingLevel.HEADING_3 }),
+    ...(modalReport.recommendations.content || []).map(
+      r => new Paragraph({ text: `- ${r}` })
+    ),
+    new Paragraph({ text: 'Monitor', heading: HeadingLevel.HEADING_3 }),
+    ...(modalReport.recommendations.monitor || []).map(
+      r => new Paragraph({ text: `- ${r}` })
+    ),
+    new Paragraph({
+      text: 'Conclusion',
+      heading: HeadingLevel.HEADING_2
+    }),
+    new Paragraph({ text: modalReport.conclusion }),
+    new Paragraph({ text: `Prepared by: ${modalReport.preparedBy}` })
+  ]
+
+  doc.addSection({ children })
+
+  Packer.toBlob(doc).then(blob => {
+    saveAs(blob, `${modalReport.companyName}_SocialMediaReport.docx`)
+  })
+}
+
 export default function ReportDashboard () {
-  // --- State
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
     dayjs().startOf('month'),
     dayjs().endOf('month')
@@ -92,40 +353,48 @@ export default function ReportDashboard () {
   const reportRef = useRef<HTMLDivElement | null>(null)
   const { companyData, user } = useCompanyData()
   const [metrics, setMetrics] = useState<MetricsRecord[]>([])
-
-  // Modal AI state
   const {
     insights: modalReport,
     loading: modalLoading,
     error: modalError,
     generateInsights
   } = useAiInsights()
-
-  // Helper for fetching metrics for modal
   const [modalMetrics, setModalMetrics] = useState<MetricsRecord[]>([])
+  const [chartsReady, setChartsReady] = useState(false)
 
-  // PDF mode styles injection (should useEffect for SSR safety)
   useEffect(() => {
     if (
-      typeof window !== 'undefined' &&
-      !document.getElementById('pdf-style')
+      consolidatedChartRef.current &&
+      funnelChartRef.current &&
+      consolidatedChartRef.current.chart &&
+      funnelChartRef.current.chart
     ) {
-      const style = document.createElement('style')
-      style.id = 'pdf-style'
-      style.innerHTML = `
-        .pdf-mode, .pdf-mode * {
-          background: #fff !important;
-          color: #111 !important;
-          border-color: #222 !important;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-      `
-      document.head.appendChild(style)
+      setChartsReady(true)
     }
-  }, [])
+  }, [consolidatedChartRef.current, funnelChartRef.current, isModalOpen])
 
-  // --- Firestore Data Fetching
+  // History for moving average computation
+  const [platformMetricsHistory, setPlatformMetricsHistory] = useState<
+    Record<string, any[]>
+  >({})
+
+  useEffect(() => {
+    if (isModalOpen) {
+      setTimeout(() => {
+        if (
+          consolidatedChartRef.current &&
+          consolidatedChartRef.current.chart &&
+          funnelChartRef.current &&
+          funnelChartRef.current.chart
+        ) {
+          setChartsReady(true)
+        }
+      }, 700)
+    } else {
+      setChartsReady(false)
+    }
+  }, [isModalOpen])
+
   useEffect(() => {
     if (!user || !companyData?.id || !dateRange[0] || !dateRange[1]) {
       setMetrics([])
@@ -148,11 +417,17 @@ export default function ReportDashboard () {
         where('period', '<=', end)
       )
     ).then(snap => {
-      setMetrics(snap.docs.map(doc => doc.data() as MetricsRecord))
+      const rows = snap.docs.map(doc => doc.data() as MetricsRecord)
+      setMetrics(rows)
+      const history: Record<string, any[]> = {}
+      rows.forEach(row => {
+        if (!history[row.platform]) history[row.platform] = []
+        history[row.platform].push({ ...row.metrics, period: row.period })
+      })
+      setPlatformMetricsHistory(history)
     })
   }, [user, companyData, dateRange])
 
-  // Modal metrics (per month)
   useEffect(() => {
     if (!user || !companyData?.id || !modalMonth) {
       setModalMetrics([])
@@ -172,7 +447,65 @@ export default function ReportDashboard () {
     })
   }, [user, companyData, modalMonth])
 
-  // --- Data Aggregation
+  function buildAIPayloadFromMetrics (
+    metrics: MetricsRecord[],
+    platformMetricsHistory: Record<string, any[]>
+  ) {
+    // Aggregates by platform, and adds 3-pt moving average for each metric label
+    // Only use platforms shown in the chart
+    const platforms = ['Google', 'Facebook', 'Instagram', 'Tiktok', 'X']
+    const agg: Record<string, Record<string, number>> = {}
+
+    // Aggregate all metrics by platform (sum)
+    metrics.forEach(row => {
+      const pf = row.platform.charAt(0).toUpperCase() + row.platform.slice(1)
+      if (!agg[pf]) agg[pf] = {}
+      Object.entries(row.metrics || {}).forEach(([k, v]) => {
+        if (typeof v === 'number') {
+          agg[pf][k] = (agg[pf][k] || 0) + v
+        }
+      })
+    })
+
+    // Build payload for each platform, include moving average
+    return platforms
+      .filter(pf => agg[pf])
+      .map(pf => {
+        const keys = Object.keys(agg[pf])
+        // For MAs, we use platformMetricsHistory
+        const hist = platformMetricsHistory[pf] || []
+        return {
+          name: pf,
+          metrics: keys.map(label => ({
+            label: label
+              .replace(/_/g, ' ')
+              .replace(/\b\w/g, l => l.toUpperCase()),
+            value: agg[pf][label],
+            ma_3pt: computeMovingAverage(hist, label).pop() || null // last MA value
+          }))
+        }
+      })
+  }
+
+  const openModal = () => {
+    setIsModalOpen(true)
+    setModalMonth(null)
+  }
+  const closeModal = () => setIsModalOpen(false)
+  const handleGenerateReport = () => {
+    if (!modalMonth) return
+    const period = modalMonth.format('MMMM YYYY')
+    const platforms = buildAIPayloadFromMetrics(metrics, platformMetricsHistory) // aggregate using main table data
+    generateInsights({
+      platforms,
+      companyName: companyData?.companyName || '',
+      period: `${dateRange[0].format('MMM YYYY')} - ${dateRange[1].format(
+        'MMM YYYY'
+      )}`
+    })
+  }
+
+  // Chart configs with refs
   const agg = useMemo(() => {
     const platforms: Record<string, Record<string, number>[]> = {}
     metrics.forEach(row => {
@@ -185,63 +518,6 @@ export default function ReportDashboard () {
     return { platforms, getSum }
   }, [metrics])
 
-  // --- AI Payload Builder
-  function buildAIPayloadFromMetrics (metrics: MetricsRecord[]) {
-    return metrics.map(row => ({
-      name: row.platform.charAt(0).toUpperCase() + row.platform.slice(1),
-      metrics: Object.entries(row.metrics || {}).map(([label, value]) => ({
-        label: label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        value
-      }))
-    }))
-  }
-
-  // --- Modal handlers
-  const openModal = () => {
-    setIsModalOpen(true)
-    setModalMonth(null)
-  }
-  const closeModal = () => setIsModalOpen(false)
-  const handleGenerateReport = () => {
-    if (!modalMonth) return
-    const period = modalMonth.format('MMMM YYYY')
-    const platforms = buildAIPayloadFromMetrics(modalMetrics)
-    generateInsights({
-      platforms,
-      companyName: companyData?.companyName || '',
-      period
-    })
-  }
-
-  // --- PDF Download
-  const downloadPDF = () => {
-    if (reportRef.current) {
-      reportRef.current.classList.add('pdf-mode')
-      html2pdf()
-        .from(reportRef.current)
-        .set({
-          margin: 0.5,
-          filename: `Report_${
-            modalMonth
-              ? modalMonth.format('YYYY-MM')
-              : dayjs().format('YYYY-MM')
-          }.pdf`,
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-        })
-        .save()
-        .then(
-          () =>
-            reportRef.current && reportRef.current.classList.remove('pdf-mode')
-        )
-        .catch(
-          () =>
-            reportRef.current && reportRef.current.classList.remove('pdf-mode')
-        )
-    }
-  }
-
-  // --- Metrics Summary
   const totalViews = ['google', 'facebook', 'instagram', 'tiktok', 'x'].reduce(
     (sum, pf) => sum + agg.getSum(pf, 'views'),
     0
@@ -256,7 +532,6 @@ export default function ReportDashboard () {
       ? `${((totalBookings / totalViews) * 100).toFixed(1)}%`
       : '--'
 
-  // --- Visual Summary Cards
   const visualSummary = [
     {
       label: 'Total Views',
@@ -278,9 +553,7 @@ export default function ReportDashboard () {
     }
   ]
 
-  // --- Chart Configs (typed)
   const chartConfigs: HighchartsOptions[] = [
-    // 1. Platform Metrics with View Trends
     {
       chart: { zoomType: 'xy' },
       title: { text: 'Platform Metrics with View Trends', color: '#fff' },
@@ -338,7 +611,6 @@ export default function ReportDashboard () {
         }
       ]
     },
-    // 2. Funnel Chart: Website Clicks → Landing Page Views → Signups → Bookings
     {
       chart: { type: 'funnel' },
       title: { text: 'Conversion Funnel' },
@@ -365,7 +637,6 @@ export default function ReportDashboard () {
         }
       ]
     },
-    // 3. Monthly Trends for Likes and Followers (across all months in range)
     {
       title: { text: 'Monthly Trends for Likes and Followers' },
       xAxis: {
@@ -387,7 +658,6 @@ export default function ReportDashboard () {
         }
       ]
     },
-    // 4. Pie Chart: Engagement Distribution
     {
       chart: { type: 'pie' },
       title: { text: 'Engagement Distribution' },
@@ -418,7 +688,6 @@ export default function ReportDashboard () {
         }
       ]
     },
-    // 5. Radar Chart (Polar): Engagement Quality Overview
     {
       chart: { polar: true, type: 'line' },
       title: { text: 'Engagement Quality Overview' },
@@ -447,7 +716,6 @@ export default function ReportDashboard () {
         }
       ]
     },
-    // 6. Monthly Growth in Followers (compare Instagram and X)
     {
       chart: { type: 'column' },
       title: { text: 'Monthly Growth in Followers' },
@@ -482,7 +750,6 @@ export default function ReportDashboard () {
     }
   ]
 
-  // --- Render
   return (
     <Box style={{ minHeight: '100vh', padding: 32, background: '#191A1F' }}>
       <Flex justify='flex-end' align='center' mb={6} style={{ gap: 16 }}>
@@ -526,8 +793,66 @@ export default function ReportDashboard () {
       </Row>
       <div ref={reportRef}>
         <Row gutter={[24, 24]}>
-          {chartConfigs.map((config, idx) => (
-            <Col xs={24} md={12} key={idx}>
+          <Col xs={24} md={12}>
+            <Card
+              style={{
+                background: '#23242A',
+                color: '#fff',
+                minHeight: 360
+              }}
+              title={
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>
+                  {chartConfigs[0]?.title?.text || `Chart 1`}
+                </Text>
+              }
+              extra={
+                <Button
+                  size='small'
+                  onClick={() => setExpandedChart({ ...chartConfigs[0] })}
+                >
+                  Expand <MotionIcon style={{ marginLeft: 4 }} />
+                </Button>
+              }
+              hoverable
+            >
+              <HighchartsReact
+                ref={consolidatedChartRef}
+                highcharts={Highcharts}
+                options={chartConfigs[0]}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} md={12}>
+            <Card
+              style={{
+                background: '#23242A',
+                color: '#fff',
+                minHeight: 360
+              }}
+              title={
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>
+                  {chartConfigs[1]?.title?.text || `Chart 2`}
+                </Text>
+              }
+              extra={
+                <Button
+                  size='small'
+                  onClick={() => setExpandedChart({ ...chartConfigs[1] })}
+                >
+                  Expand <MotionIcon style={{ marginLeft: 4 }} />
+                </Button>
+              }
+              hoverable
+            >
+              <HighchartsReact
+                ref={funnelChartRef}
+                highcharts={Highcharts}
+                options={chartConfigs[1]}
+              />
+            </Card>
+          </Col>
+          {chartConfigs.slice(2).map((config, idx) => (
+            <Col xs={24} md={12} key={idx + 2}>
               <Card
                 style={{
                   background: '#23242A',
@@ -536,7 +861,7 @@ export default function ReportDashboard () {
                 }}
                 title={
                   <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                    {config?.title?.text || `Chart ${idx + 1}`}
+                    {config?.title?.text || `Chart ${idx + 3}`}
                   </Text>
                 }
                 extra={
@@ -569,11 +894,8 @@ export default function ReportDashboard () {
         title={
           <div>
             <Title level={4} style={{ margin: 0 }}>
-              Generate AI Social Media Report
+              Generate Social Media Report
             </Title>
-            <Text type='secondary'>
-              Select a month and click "Generate Report"
-            </Text>
           </div>
         }
         open={isModalOpen}
@@ -590,17 +912,6 @@ export default function ReportDashboard () {
             marginBottom: 20
           }}
         >
-          <MonthPicker
-            value={modalMonth}
-            onChange={setModalMonth}
-            placeholder='Select month'
-            style={{
-              background: '#2a2a2e',
-              color: 'white',
-              borderRadius: 6,
-              width: 200
-            }}
-          />
           <Button
             type='primary'
             onClick={handleGenerateReport}
@@ -634,9 +945,22 @@ export default function ReportDashboard () {
               </Title>
               <Text type='secondary'>{modalReport.period}</Text>
               <Divider />
-              <Paragraph>{modalReport.overview}</Paragraph>
+              <AntParagraph>{modalReport.overview}</AntParagraph>
               <Divider />
-              {modalReport.platforms?.map(platform => (
+              {modalReport?.consolidatedChartObservations && (
+                <div style={{ marginBottom: 20 }}>
+                  <Title level={5}>Platform Metrics View Observations</Title>
+                  <ul>
+                    {modalReport.consolidatedChartObservations.map(
+                      (obs, idx) => (
+                        <li key={idx}>{obs}</li>
+                      )
+                    )}
+                  </ul>
+                </div>
+              )}
+              <Divider>Platform Breakdown</Divider>
+              {modalReport?.platforms?.map(platform => (
                 <div key={platform.name} style={{ marginBottom: 24 }}>
                   <Title level={5}>{platform.name}</Title>
                   <table
@@ -653,7 +977,7 @@ export default function ReportDashboard () {
                             border: '1px solid #e5e7eb',
                             background: '#f8fafc',
                             padding: 8,
-                            color: '#222', // << set to black/near-black!
+                            color: '#222',
                             fontWeight: 600
                           }}
                         >
@@ -664,27 +988,54 @@ export default function ReportDashboard () {
                             border: '1px solid #e5e7eb',
                             background: '#f8fafc',
                             padding: 8,
-                            color: '#222', // << set to black/near-black!
+                            color: '#222',
                             fontWeight: 600
                           }}
                         >
                           Value
                         </th>
+                        <th
+                          style={{
+                            border: '1px solid #e5e7eb',
+                            background: '#f8fafc',
+                            padding: 8,
+                            color: '#222',
+                            fontWeight: 600
+                          }}
+                        >
+                          3-Point MA
+                        </th>
                       </tr>
                     </thead>
-
                     <tbody>
-                      {platform.metrics.map(m => (
+                      {platform.metrics.map((m, idx) => (
                         <tr key={m.label}>
                           <td
-                            style={{ border: '1px solid #e5e7eb', padding: 8 }}
+                            style={{
+                              border: '1px solid #e5e7eb',
+                              padding: 8
+                            }}
                           >
                             {m.label}
                           </td>
                           <td
-                            style={{ border: '1px solid #e5e7eb', padding: 8 }}
+                            style={{
+                              border: '1px solid #e5e7eb',
+                              padding: 8
+                            }}
                           >
                             {m.value}
+                          </td>
+                          <td
+                            style={{
+                              border: '1px solid #e5e7eb',
+                              padding: 8
+                            }}
+                          >
+                            {computeMovingAverage(
+                              platformMetricsHistory[platform.name] || [],
+                              m.label
+                            )[idx] ?? ''}
                           </td>
                         </tr>
                       ))}
@@ -696,6 +1047,19 @@ export default function ReportDashboard () {
                       <li key={i}>{obs}</li>
                     ))}
                   </ul>
+                  {platform.name === 'Google' &&
+                    modalReport?.googleFunnelObservations && (
+                      <div style={{ margin: '16px 0 8px 0' }}>
+                        <Title level={5}>Google Funnel Observations</Title>
+                        <ul>
+                          {modalReport.googleFunnelObservations.map(
+                            (obs, idx) => (
+                              <li key={idx}>{obs}</li>
+                            )
+                          )}
+                        </ul>
+                      </div>
+                    )}
                 </div>
               ))}
               <Divider />
@@ -768,14 +1132,26 @@ export default function ReportDashboard () {
               </ul>
               <Divider />
               <Title level={5}>Conclusion</Title>
-              <Paragraph>{modalReport.conclusion}</Paragraph>
+              <AntParagraph>{modalReport.conclusion}</AntParagraph>
               <Divider />
               <Text type='secondary'>
                 Prepared by: {modalReport.preparedBy}
               </Text>
             </div>
-            <Button type='primary' icon={<FiDownload />} onClick={downloadPDF}>
-              Download PDF
+            <Button
+              type='primary'
+              icon={<FiDownload />}
+              disabled={!chartsReady}
+              onClick={async () =>
+                await exportReportToWord(
+                  modalReport,
+                  platformMetricsHistory,
+                  consolidatedChartRef,
+                  funnelChartRef
+                )
+              }
+            >
+              Download Word
             </Button>
           </>
         )}
