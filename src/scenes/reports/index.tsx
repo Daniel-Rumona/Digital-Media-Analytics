@@ -261,17 +261,20 @@ async function exportReportToWord (
             ]
           }),
           ...(platform.metrics || []).map((m, idx) => {
-            const averages = computeMovingAverage(platformMetricsHistory[historyKey] || [], m.label)
-            const average = averages[idx] || 'N/A'
+  const historyData = platformMetricsHistory[historyKey] || []
+  console.log(`MA Input for ${platform.name} → ${m.label}:`, historyData)
 
-            return new TableRow({
-              children: [
-                new TableCell({ children: [new Paragraph(String(m.label))] }),
-                new TableCell({ children: [new Paragraph(String(m.value))] }),
-                new TableCell({ children: [new Paragraph(String(average))] })
-              ]
-            })
-          })
+  const averages = computeMovingAverage(historyData, m.label)
+  const average = averages[idx] || 'N/A'
+
+  return new TableRow({
+    children: [
+      new TableCell({ children: [new Paragraph(String(m.label))] }),
+      new TableCell({ children: [new Paragraph(String(m.value))] }),
+      new TableCell({ children: [new Paragraph(String(average))] })
+    ]
+  })
+})
         ]
       })
     ]
