@@ -496,7 +496,7 @@ export default function ReportDashboard () {
   
   const handleGenerateReport = () => {
     console.log('Generating')
-    const period = modalMonth.format('MMMM YYYY')
+ const period = `${dateRange[0].format('MMM YYYY')} - ${dateRange[1].format('MMM YYYY')}`
     const platforms = buildAIPayloadFromMetrics(metrics, platformMetricsHistory) // aggregate using main table data
     generateInsights({
       platforms,
