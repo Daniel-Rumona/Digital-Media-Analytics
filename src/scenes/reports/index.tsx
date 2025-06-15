@@ -915,7 +915,6 @@ export default function ReportDashboard () {
           <Button
             type='primary'
             onClick={handleGenerateReport}
-            disabled={!modalMonth}
             loading={modalLoading}
           >
             Generate Report
