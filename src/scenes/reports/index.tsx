@@ -491,9 +491,10 @@ export default function ReportDashboard () {
     setIsModalOpen(true)
     setModalMonth(null)
   }
+  
   const closeModal = () => setIsModalOpen(false)
+  
   const handleGenerateReport = () => {
-    if (!modalMonth) return
     const period = modalMonth.format('MMMM YYYY')
     const platforms = buildAIPayloadFromMetrics(metrics, platformMetricsHistory) // aggregate using main table data
     generateInsights({
