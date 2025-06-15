@@ -417,10 +417,11 @@ export default function ReportDashboard () {
       const rows = snap.docs.map(doc => doc.data() as MetricsRecord)
       setMetrics(rows)
       const history: Record<string, any[]> = {}
-      rows.forEach(row => {
-        if (!history[row.platform]) history[row.platform] = []
-        history[row.platform].push({ ...row.metrics, period: row.period })
-      })
+     rows.forEach(row => {
+  const pf = row.platform.toLowerCase()
+  if (!history[pf]) history[pf] = []
+  history[pf].push({ ...row.metrics, period: row.period })
+})
       setPlatformMetricsHistory(history)
     })
   }, [user, companyData, dateRange])
