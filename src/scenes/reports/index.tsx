@@ -176,11 +176,6 @@ async function exportReportToWord (
   const funnelImg = base64ToArrayBuffer(funnelDataUrl)
   const doc = new Document({ sections: [] })
 
-  const historyKey = platform.name.toLowerCase()
-const averages = computeMovingAverage(platformMetricsHistory[historyKey] || [], m.label)
-const average = averages[idx] || 'N/A'
-
-
   const children = [
     new Paragraph({
       text: `${modalReport.companyName} — Social Media Report`,
@@ -258,23 +253,26 @@ const average = averages[idx] || 'N/A'
               new TableCell({ children: [new Paragraph('3-Point MA')] })
             ]
           }),
-          ...(platform.metrics || []).map(
-            (m, idx) =>
-              new TableRow({
-                children: [
-                  new TableCell({
-                    children: [new Paragraph(String(m.label))]
-                  }),
-                  new TableCell({
-                    children: [new Paragraph(String(m.value))]
-                  }),
-                new TableCell({
-  children: [new Paragraph(String(average))]
-})
+        ...(platform.metrics || []).map((m, idx) => {
+  const historyKey = platform.name.toLowerCase()
+  const averages = computeMovingAverage(platformMetricsHistory[historyKey] || [], m.label)
+  const average = averages[idx] || 'N/A'
 
-                ]
-              })
-          )
+  return new TableRow({
+    children: [
+      new TableCell({
+        children: [new Paragraph(String(m.label))]
+      }),
+      new TableCell({
+        children: [new Paragraph(String(m.value))]
+      }),
+      new TableCell({
+        children: [new Paragraph(String(average))]
+      })
+    ]
+  })
+})
+        )
         ]
       })
     ]),
