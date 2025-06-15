@@ -177,39 +177,44 @@ async function exportReportToWord (
   const doc = new Document({ sections: [] })
 
   const children = [
-    new Paragraph({
-      text: `${modalReport.companyName} — Social Media Report`,
-      heading: HeadingLevel.HEADING_1
-    }),
-    new Paragraph({
-      text: modalReport.period,
-      heading: HeadingLevel.HEADING_2
-    }),
-    new Paragraph({ text: modalReport.overview }),
-    new Paragraph({
-      text: 'Platform Metrics View Chart',
-      heading: HeadingLevel.HEADING_2
-    }),
-    new Paragraph({
-      children: [
-        new ImageRun({
-          data: consolidatedImg,
-          transformation: { width: 600, height: 300 }
-        })
-      ]
-    }),
-    new Paragraph({
-      text: 'Platform Metrics View Observations',
-      heading: HeadingLevel.HEADING_3
-    }),
-    ...(modalReport.consolidatedChartObservations || []).map(
-      o => new Paragraph({ text: `- ${o}` })
-    ),
-    ...modalReport.platforms.flatMap(platform => [
+  new Paragraph({
+    text: `${modalReport.companyName} — Social Media Report`,
+    heading: HeadingLevel.HEADING_1
+  }),
+  new Paragraph({
+    text: modalReport.period,
+    heading: HeadingLevel.HEADING_2
+  }),
+  new Paragraph({ text: modalReport.overview }),
+  new Paragraph({
+    text: 'Platform Metrics View Chart',
+    heading: HeadingLevel.HEADING_2
+  }),
+  new Paragraph({
+    children: [
+      new ImageRun({
+        data: consolidatedImg,
+        transformation: { width: 600, height: 300 }
+      })
+    ]
+  }),
+  new Paragraph({
+    text: 'Platform Metrics View Observations',
+    heading: HeadingLevel.HEADING_3
+  }),
+  ...(modalReport.consolidatedChartObservations || []).map(
+    o => new Paragraph({ text: `- ${o}` })
+  ),
+
+  // Platform sections
+  ...modalReport.platforms.flatMap(platform => {
+    const historyKey = platform.name.toLowerCase()
+    return [
       new Paragraph({
         text: platform.name,
         heading: HeadingLevel.HEADING_2
       }),
+
       ...(platform.name === 'Google'
         ? [
             new Paragraph({
@@ -233,6 +238,7 @@ async function exportReportToWord (
             )
           ]
         : []),
+
       new Paragraph({
         text: 'Key Observations',
         heading: HeadingLevel.HEADING_3
@@ -240,6 +246,7 @@ async function exportReportToWord (
       ...(platform.observations || []).map(
         o => new Paragraph({ text: `- ${o}` })
       ),
+
       new Paragraph({
         text: 'Metrics',
         heading: HeadingLevel.HEADING_3
@@ -250,83 +257,79 @@ async function exportReportToWord (
             children: [
               new TableCell({ children: [new Paragraph('Metric')] }),
               new TableCell({ children: [new Paragraph('Value')] }),
-              new TableCell({ children: [new Paragraph('3-Point MA')] })
+              new TableCell({ children: [new Paragraph('Average')] })
             ]
           }),
-        ...(platform.metrics || []).map((m, idx) => {
-  const historyKey = platform.name.toLowerCase()
-  const averages = computeMovingAverage(platformMetricsHistory[historyKey] || [], m.label)
-  const average = averages[idx] || 'N/A'
+          ...(platform.metrics || []).map((m, idx) => {
+            const averages = computeMovingAverage(platformMetricsHistory[historyKey] || [], m.label)
+            const average = averages[idx] || 'N/A'
 
-  return new TableRow({
-    children: [
-      new TableCell({
-        children: [new Paragraph(String(m.label))]
-      }),
-      new TableCell({
-        children: [new Paragraph(String(m.value))]
-      }),
-      new TableCell({
-        children: [new Paragraph(String(average))]
-      })
-    ]
-  })
-})
-        )
+            return new TableRow({
+              children: [
+                new TableCell({ children: [new Paragraph(String(m.label))] }),
+                new TableCell({ children: [new Paragraph(String(m.value))] }),
+                new TableCell({ children: [new Paragraph(String(average))] })
+              ]
+            })
+          })
         ]
       })
-    ]),
-    new Paragraph({
-      text: 'SWOT Analysis',
-      heading: HeadingLevel.HEADING_2
-    }),
-    new Paragraph({ text: 'Strengths', heading: HeadingLevel.HEADING_3 }),
-    ...(modalReport.swot.strengths || []).map(
-      s => new Paragraph({ text: `- ${s}` })
-    ),
-    new Paragraph({ text: 'Weaknesses', heading: HeadingLevel.HEADING_3 }),
-    ...(modalReport.swot.weaknesses || []).map(
-      s => new Paragraph({ text: `- ${s}` })
-    ),
-    new Paragraph({ text: 'Opportunities', heading: HeadingLevel.HEADING_3 }),
-    ...(modalReport.swot.opportunities || []).map(
-      s => new Paragraph({ text: `- ${s}` })
-    ),
-    new Paragraph({ text: 'Threats', heading: HeadingLevel.HEADING_3 }),
-    ...(modalReport.swot.threats || []).map(
-      s => new Paragraph({ text: `- ${s}` })
-    ),
-    new Paragraph({
-      text: 'Recommendations',
-      heading: HeadingLevel.HEADING_2
-    }),
-    new Paragraph({ text: 'Growth', heading: HeadingLevel.HEADING_3 }),
-    ...(modalReport.recommendations.growth || []).map(
-      r => new Paragraph({ text: `- ${r}` })
-    ),
-    new Paragraph({ text: 'Engagement', heading: HeadingLevel.HEADING_3 }),
-    ...(modalReport.recommendations.engagement || []).map(
-      r => new Paragraph({ text: `- ${r}` })
-    ),
-    new Paragraph({ text: 'Conversions', heading: HeadingLevel.HEADING_3 }),
-    ...(modalReport.recommendations.conversions || []).map(
-      r => new Paragraph({ text: `- ${r}` })
-    ),
-    new Paragraph({ text: 'Content', heading: HeadingLevel.HEADING_3 }),
-    ...(modalReport.recommendations.content || []).map(
-      r => new Paragraph({ text: `- ${r}` })
-    ),
-    new Paragraph({ text: 'Monitor', heading: HeadingLevel.HEADING_3 }),
-    ...(modalReport.recommendations.monitor || []).map(
-      r => new Paragraph({ text: `- ${r}` })
-    ),
-    new Paragraph({
-      text: 'Conclusion',
-      heading: HeadingLevel.HEADING_2
-    }),
-    new Paragraph({ text: modalReport.conclusion }),
-    new Paragraph({ text: `Prepared by: ${modalReport.preparedBy}` })
-  ]
+    ]
+  }),
+
+  new Paragraph({
+    text: 'SWOT Analysis',
+    heading: HeadingLevel.HEADING_2
+  }),
+  new Paragraph({ text: 'Strengths', heading: HeadingLevel.HEADING_3 }),
+  ...(modalReport.swot.strengths || []).map(
+    s => new Paragraph({ text: `- ${s}` })
+  ),
+  new Paragraph({ text: 'Weaknesses', heading: HeadingLevel.HEADING_3 }),
+  ...(modalReport.swot.weaknesses || []).map(
+    s => new Paragraph({ text: `- ${s}` })
+  ),
+  new Paragraph({ text: 'Opportunities', heading: HeadingLevel.HEADING_3 }),
+  ...(modalReport.swot.opportunities || []).map(
+    s => new Paragraph({ text: `- ${s}` })
+  ),
+  new Paragraph({ text: 'Threats', heading: HeadingLevel.HEADING_3 }),
+  ...(modalReport.swot.threats || []).map(
+    s => new Paragraph({ text: `- ${s}` })
+  ),
+
+  new Paragraph({
+    text: 'Recommendations',
+    heading: HeadingLevel.HEADING_2
+  }),
+  new Paragraph({ text: 'Growth', heading: HeadingLevel.HEADING_3 }),
+  ...(modalReport.recommendations.growth || []).map(
+    r => new Paragraph({ text: `- ${r}` })
+  ),
+  new Paragraph({ text: 'Engagement', heading: HeadingLevel.HEADING_3 }),
+  ...(modalReport.recommendations.engagement || []).map(
+    r => new Paragraph({ text: `- ${r}` })
+  ),
+  new Paragraph({ text: 'Conversions', heading: HeadingLevel.HEADING_3 }),
+  ...(modalReport.recommendations.conversions || []).map(
+    r => new Paragraph({ text: `- ${r}` })
+  ),
+  new Paragraph({ text: 'Content', heading: HeadingLevel.HEADING_3 }),
+  ...(modalReport.recommendations.content || []).map(
+    r => new Paragraph({ text: `- ${r}` })
+  ),
+  new Paragraph({ text: 'Monitor', heading: HeadingLevel.HEADING_3 }),
+  ...(modalReport.recommendations.monitor || []).map(
+    r => new Paragraph({ text: `- ${r}` })
+  ),
+
+  new Paragraph({
+    text: 'Conclusion',
+    heading: HeadingLevel.HEADING_2
+  }),
+  new Paragraph({ text: modalReport.conclusion }),
+  new Paragraph({ text: `Prepared by: ${modalReport.preparedBy}` })
+]
 
   doc.addSection({ children })
 
