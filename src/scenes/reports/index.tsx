@@ -176,6 +176,11 @@ async function exportReportToWord (
   const funnelImg = base64ToArrayBuffer(funnelDataUrl)
   const doc = new Document({ sections: [] })
 
+  const historyKey = platform.name.toLowerCase()
+const averages = computeMovingAverage(platformMetricsHistory[historyKey] || [], m.label)
+const average = averages[idx] || 'N/A'
+
+
   const children = [
     new Paragraph({
       text: `${modalReport.companyName} — Social Media Report`,
@@ -263,18 +268,10 @@ async function exportReportToWord (
                   new TableCell({
                     children: [new Paragraph(String(m.value))]
                   }),
-                  new TableCell({
-                    children: [
-                      new Paragraph(
-                        String(
-                          computeMovingAverage(
-                            platformMetricsHistory[platform.name] || [],
-                            m.label
-                          )[idx] ?? ''
-                        )
-                      )
-                    ]
-                  })
+                new TableCell({
+  children: [new Paragraph(String(average))]
+})
+
                 ]
               })
           )
