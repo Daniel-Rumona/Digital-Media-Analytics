@@ -97,16 +97,6 @@ type ModalReport = {
 const consolidatedChartRef = createRef<any>()
 const funnelChartRef = createRef<any>()
 
-function computeMovingAverage (arr: any[], key: string) {
-  return arr.map((row, idx, arr) => {
-    if (idx < 2) return ''
-    const vals = [arr[idx][key], arr[idx - 1][key], arr[idx - 2][key]]
-    const nums = vals.map(Number).filter(n => !isNaN(n))
-    if (nums.length < 3) return ''
-    return (nums.reduce((a, b) => a + b, 0) / 3).toFixed(2)
-  })
-}
-
 function base64ToArrayBuffer (dataUrl: string) {
   const base64 = dataUrl.split(',')[1]
   const binary = atob(base64)
@@ -156,189 +146,180 @@ async function exportReportToWord (
   consolidatedChartRef,
   funnelChartRef
 ) {
-  // Use new SVG to PNG for both charts
-  const consolidatedDataUrl = await chartRefToPngDataUrl(consolidatedChartRef)
-  const funnelDataUrl = await chartRefToPngDataUrl(funnelChartRef)
+  try {
+    // Chart capture helpers
+    const svgToPngDataUrl = async chartRef => {
+      if (
+        chartRef?.current?.chart &&
+        typeof chartRef.current.chart.getSVGForExport === 'function'
+      ) {
+        const svg = chartRef.current.chart.getSVGForExport()
+        const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })
+        const url = URL.createObjectURL(svgBlob)
 
-  if (
-    !consolidatedDataUrl ||
-    !consolidatedDataUrl.startsWith('data:image/png')
-  ) {
-    alert('Consolidated chart image not ready.')
-    return
-  }
-  if (!funnelDataUrl || !funnelDataUrl.startsWith('data:image/png')) {
-    alert('Funnel chart image not ready.')
-    return
-  }
+        return new Promise((resolve, reject) => {
+          const img = new Image()
+          img.onload = () => {
+            const canvas = document.createElement('canvas')
+            canvas.width = img.width
+            canvas.height = img.height
+            const ctx = canvas.getContext('2d')
+            ctx.drawImage(img, 0, 0)
+            const dataUrl = canvas.toDataURL('image/png')
+            URL.revokeObjectURL(url)
+            resolve(dataUrl)
+          }
+          img.onerror = err => {
+            URL.revokeObjectURL(url)
+            reject('Image load failed')
+          }
+          img.src = url
+        })
+      } else {
+        throw new Error('Chart not ready or missing getSVGForExport()')
+      }
+    }
 
-  const consolidatedImg = base64ToArrayBuffer(consolidatedDataUrl)
-  const funnelImg = base64ToArrayBuffer(funnelDataUrl)
-  const doc = new Document({ sections: [] })
+    const consolidatedDataUrl = await svgToPngDataUrl(consolidatedChartRef)
+    const funnelDataUrl = await svgToPngDataUrl(funnelChartRef)
 
-  const children = [
-  new Paragraph({
-    text: `${modalReport.companyName} — Social Media Report`,
-    heading: HeadingLevel.HEADING_1
-  }),
-  new Paragraph({
-    text: modalReport.period,
-    heading: HeadingLevel.HEADING_2
-  }),
-  new Paragraph({ text: modalReport.overview }),
-  new Paragraph({
-    text: 'Platform Metrics View Chart',
-    heading: HeadingLevel.HEADING_2
-  }),
-  new Paragraph({
-    children: [
-      new ImageRun({
-        data: consolidatedImg,
-        transformation: { width: 600, height: 300 }
-      })
-    ]
-  }),
-  new Paragraph({
-    text: 'Platform Metrics View Observations',
-    heading: HeadingLevel.HEADING_3
-  }),
-  ...(modalReport.consolidatedChartObservations || []).map(
-    o => new Paragraph({ text: `- ${o}` })
-  ),
+    if (!consolidatedDataUrl || !funnelDataUrl) {
+      alert('Could not capture one or more charts')
+      return
+    }
 
-  // Platform sections
-  ...modalReport.platforms.flatMap(platform => {
-    const historyKey = platform.name.toLowerCase()
-    return [
+    const consolidatedImg = base64ToArrayBuffer(consolidatedDataUrl)
+    const funnelImg = base64ToArrayBuffer(funnelDataUrl)
+
+    const doc = new Document({ sections: [] })
+    const children = [
       new Paragraph({
-        text: platform.name,
+        text: `${modalReport.companyName} — Social Media Report`,
+        heading: HeadingLevel.HEADING_1
+      }),
+      new Paragraph({
+        text: modalReport.period,
         heading: HeadingLevel.HEADING_2
       }),
-
-      ...(platform.name === 'Google'
-        ? [
-            new Paragraph({
-              text: 'Google Funnel Chart',
-              heading: HeadingLevel.HEADING_3
-            }),
-            new Paragraph({
-              children: [
-                new ImageRun({
-                  data: funnelImg,
-                  transformation: { width: 500, height: 220 }
-                })
-              ]
-            }),
-            new Paragraph({
-              text: 'Google Funnel Observations',
-              heading: HeadingLevel.HEADING_3
-            }),
-            ...(modalReport.googleFunnelObservations || []).map(
-              o => new Paragraph({ text: `- ${o}` })
-            )
-          ]
-        : []),
-
+      new Paragraph({ text: modalReport.overview }),
       new Paragraph({
-        text: 'Key Observations',
-        heading: HeadingLevel.HEADING_3
+        text: 'Platform Metrics View Chart',
+        heading: HeadingLevel.HEADING_2
       }),
-      ...(platform.observations || []).map(
+      new Paragraph({
+        children: [
+          new ImageRun({
+            data: consolidatedImg,
+            transformation: { width: 600, height: 300 }
+          })
+        ]
+      }),
+      ...(modalReport.consolidatedChartObservations || []).map(
         o => new Paragraph({ text: `- ${o}` })
       ),
-
-      new Paragraph({
-        text: 'Metrics',
-        heading: HeadingLevel.HEADING_3
-      }),
-      new Table({
-        rows: [
-          new TableRow({
-            children: [
-              new TableCell({ children: [new Paragraph('Metric')] }),
-              new TableCell({ children: [new Paragraph('Value')] }),
-              new TableCell({ children: [new Paragraph('Average')] })
-            ]
+      ...modalReport.platforms.flatMap(platform => {
+        const historyKey = platform.name.toLowerCase()
+        return [
+          new Paragraph({
+            text: platform.name,
+            heading: HeadingLevel.HEADING_2
           }),
-          ...(platform.metrics || []).map((m, idx) => {
-  const historyData = platformMetricsHistory[historyKey] || []
-  console.log(`MA Input for ${platform.name} → ${m.label}:`, historyData)
-
-  const averages = computeMovingAverage(historyData, m.label)
-  const average = averages[idx] || 'N/A'
-
-  return new TableRow({
-    children: [
-      new TableCell({ children: [new Paragraph(String(m.label))] }),
-      new TableCell({ children: [new Paragraph(String(m.value))] }),
-      new TableCell({ children: [new Paragraph(String(average))] })
-    ]
-  })
-})
+          ...(platform.name === 'Google'
+            ? [
+                new Paragraph({
+                  text: 'Google Funnel Chart',
+                  heading: HeadingLevel.HEADING_3
+                }),
+                new Paragraph({
+                  children: [
+                    new ImageRun({
+                      data: funnelImg,
+                      transformation: { width: 500, height: 220 }
+                    })
+                  ]
+                }),
+                ...(modalReport.googleFunnelObservations || []).map(
+                  o => new Paragraph({ text: `- ${o}` })
+                )
+              ]
+            : []),
+          new Paragraph({
+            text: 'Key Observations',
+            heading: HeadingLevel.HEADING_3
+          }),
+          ...(platform.observations || []).map(
+            o => new Paragraph({ text: `- ${o}` })
+          ),
+          new Paragraph({ text: 'Metrics', heading: HeadingLevel.HEADING_3 }),
+          new Table({
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph('Metric')] }),
+                  new TableCell({ children: [new Paragraph('Value')] }),
+                  new TableCell({ children: [new Paragraph('Industry Avg.')] })
+                ]
+              }),
+              ...(platform.metrics || []).map((m, idx) => {
+                return new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph(String(m.label))]
+                    }),
+                    new TableCell({
+                      children: [new Paragraph(String(m.value))]
+                    }),
+                    new TableCell({
+                      children: [
+                        new Paragraph(String(m.industryAverage ?? 'N/A'))
+                      ]
+                    })
+                  ]
+                })
+              })
+            ]
+          })
         ]
-      })
+      }),
+      new Paragraph({ text: 'SWOT Analysis', heading: HeadingLevel.HEADING_2 }),
+      ...['strengths', 'weaknesses', 'opportunities', 'threats'].flatMap(
+        category => [
+          new Paragraph({
+            text: category.charAt(0).toUpperCase() + category.slice(1),
+            heading: HeadingLevel.HEADING_3
+          }),
+          ...(modalReport.swot?.[category] || []).map(
+            v => new Paragraph({ text: `- ${v}` })
+          )
+        ]
+      ),
+      new Paragraph({
+        text: 'Recommendations',
+        heading: HeadingLevel.HEADING_2
+      }),
+      ...['growth', 'engagement', 'conversions', 'content', 'monitor'].flatMap(
+        category => [
+          new Paragraph({
+            text: category.charAt(0).toUpperCase() + category.slice(1),
+            heading: HeadingLevel.HEADING_3
+          }),
+          ...(modalReport.recommendations?.[category] || []).map(
+            v => new Paragraph({ text: `- ${v}` })
+          )
+        ]
+      ),
+      new Paragraph({ text: 'Conclusion', heading: HeadingLevel.HEADING_2 }),
+      new Paragraph({ text: modalReport.conclusion }),
+      new Paragraph({ text: `Prepared by: ${modalReport.preparedBy}` })
     ]
-  }),
 
-  new Paragraph({
-    text: 'SWOT Analysis',
-    heading: HeadingLevel.HEADING_2
-  }),
-  new Paragraph({ text: 'Strengths', heading: HeadingLevel.HEADING_3 }),
-  ...(modalReport.swot.strengths || []).map(
-    s => new Paragraph({ text: `- ${s}` })
-  ),
-  new Paragraph({ text: 'Weaknesses', heading: HeadingLevel.HEADING_3 }),
-  ...(modalReport.swot.weaknesses || []).map(
-    s => new Paragraph({ text: `- ${s}` })
-  ),
-  new Paragraph({ text: 'Opportunities', heading: HeadingLevel.HEADING_3 }),
-  ...(modalReport.swot.opportunities || []).map(
-    s => new Paragraph({ text: `- ${s}` })
-  ),
-  new Paragraph({ text: 'Threats', heading: HeadingLevel.HEADING_3 }),
-  ...(modalReport.swot.threats || []).map(
-    s => new Paragraph({ text: `- ${s}` })
-  ),
-
-  new Paragraph({
-    text: 'Recommendations',
-    heading: HeadingLevel.HEADING_2
-  }),
-  new Paragraph({ text: 'Growth', heading: HeadingLevel.HEADING_3 }),
-  ...(modalReport.recommendations.growth || []).map(
-    r => new Paragraph({ text: `- ${r}` })
-  ),
-  new Paragraph({ text: 'Engagement', heading: HeadingLevel.HEADING_3 }),
-  ...(modalReport.recommendations.engagement || []).map(
-    r => new Paragraph({ text: `- ${r}` })
-  ),
-  new Paragraph({ text: 'Conversions', heading: HeadingLevel.HEADING_3 }),
-  ...(modalReport.recommendations.conversions || []).map(
-    r => new Paragraph({ text: `- ${r}` })
-  ),
-  new Paragraph({ text: 'Content', heading: HeadingLevel.HEADING_3 }),
-  ...(modalReport.recommendations.content || []).map(
-    r => new Paragraph({ text: `- ${r}` })
-  ),
-  new Paragraph({ text: 'Monitor', heading: HeadingLevel.HEADING_3 }),
-  ...(modalReport.recommendations.monitor || []).map(
-    r => new Paragraph({ text: `- ${r}` })
-  ),
-
-  new Paragraph({
-    text: 'Conclusion',
-    heading: HeadingLevel.HEADING_2
-  }),
-  new Paragraph({ text: modalReport.conclusion }),
-  new Paragraph({ text: `Prepared by: ${modalReport.preparedBy}` })
-]
-
-  doc.addSection({ children })
-
-  Packer.toBlob(doc).then(blob => {
+    doc.addSection({ children })
+    const blob = await Packer.toBlob(doc)
     saveAs(blob, `${modalReport.companyName}_SocialMediaReport.docx`)
-  })
+  } catch (err) {
+    console.error('Report export failed:', err)
+    alert('Failed to export report. Check console for details.')
+  }
 }
 
 export default function ReportDashboard () {
@@ -421,11 +402,11 @@ export default function ReportDashboard () {
       const rows = snap.docs.map(doc => doc.data() as MetricsRecord)
       setMetrics(rows)
       const history: Record<string, any[]> = {}
-     rows.forEach(row => {
-  const pf = row.platform.toLowerCase()
-  if (!history[pf]) history[pf] = []
-  history[pf].push({ ...row.metrics, period: row.period })
-})
+      rows.forEach(row => {
+        const pf = row.platform.toLowerCase()
+        if (!history[pf]) history[pf] = []
+        history[pf].push({ ...row.metrics, period: row.period })
+      })
       setPlatformMetricsHistory(history)
     })
   }, [user, companyData, dateRange])
@@ -483,7 +464,7 @@ export default function ReportDashboard () {
               .replace(/_/g, ' ')
               .replace(/\b\w/g, l => l.toUpperCase()),
             value: agg[pf][label],
-            ma_3pt: computeMovingAverage(hist, label).pop() || null // last MA value
+            industryAverage: null // Let AI populate realistic benchmarks
           }))
         }
       })
@@ -493,12 +474,14 @@ export default function ReportDashboard () {
     setIsModalOpen(true)
     setModalMonth(null)
   }
-  
+
   const closeModal = () => setIsModalOpen(false)
-  
+
   const handleGenerateReport = () => {
     console.log('Generating')
- const period = `${dateRange[0].format('MMM YYYY')} - ${dateRange[1].format('MMM YYYY')}`
+    const period = `${dateRange[0].format('MMM YYYY')} - ${dateRange[1].format(
+      'MMM YYYY'
+    )}`
     const platforms = buildAIPayloadFromMetrics(metrics, platformMetricsHistory) // aggregate using main table data
     generateInsights({
       platforms,
@@ -634,7 +617,7 @@ export default function ReportDashboard () {
           name: 'Users',
           data: [
             ['Website Clicks', agg.getSum('google', 'website clicks')],
-            ['Landing Page Views', agg.getSum('google', 'views')],
+            ['Landing Page', agg.getSum('google', 'views')],
             ['Calls', agg.getSum('google', 'calls')],
             ['Bookings', agg.getSum('google', 'booking clicks')]
           ]
@@ -1006,7 +989,7 @@ export default function ReportDashboard () {
                             fontWeight: 600
                           }}
                         >
-                          3-Point MA
+                          Industry Avg.
                         </th>
                       </tr>
                     </thead>
@@ -1035,10 +1018,7 @@ export default function ReportDashboard () {
                               padding: 8
                             }}
                           >
-                            {computeMovingAverage(
-                              platformMetricsHistory[platform.name] || [],
-                              m.label
-                            )[idx] ?? ''}
+                            {m.industryAverage ?? 'N/A'}
                           </td>
                         </tr>
                       ))}
