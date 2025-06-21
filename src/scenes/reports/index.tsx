@@ -93,6 +93,10 @@ type ModalReport = {
   preparedBy: string
 }
 
+Highcharts.setOptions({
+  exporting: { enabled: false }
+})
+
 // Chart refs
 const consolidatedChartRef = createRef<any>()
 const funnelChartRef = createRef<any>()
@@ -544,7 +548,9 @@ export default function ReportDashboard () {
     {
       chart: { zoomType: 'xy' },
       title: { text: 'Platform Metrics with View Trends', color: '#fff' },
-      xAxis: [{ categories: ['Google', 'Facebook', 'Instagram', 'TikTok'] }],
+      xAxis: [
+        { categories: ['Google', 'Facebook', 'Instagram', 'TikTok', 'X'] }
+      ],
       yAxis: [
         { title: { text: 'Counts' } },
         { title: { text: 'Views' }, opposite: true }
@@ -553,45 +559,13 @@ export default function ReportDashboard () {
       series: [
         {
           type: 'column',
-          name: 'Likes',
-          data: [
-            agg.getSum('google', 'likes'),
-            agg.getSum('facebook', 'likes'),
-            agg.getSum('instagram', 'likes'),
-            agg.getSum('tiktok', 'likes')
-          ],
-          color: '#ED64A6'
-        },
-        {
-          type: 'column',
-          name: 'Followers',
-          data: [
-            agg.getSum('google', 'followers'),
-            agg.getSum('facebook', 'followers'),
-            agg.getSum('instagram', 'followers'),
-            agg.getSum('tiktok', 'followers')
-          ],
-          color: '#48BB78'
-        },
-        {
-          type: 'column',
-          name: 'Clicks',
-          data: [
-            agg.getSum('google', 'website clicks'),
-            agg.getSum('facebook', 'website clicks'),
-            agg.getSum('instagram', 'website clicks'),
-            agg.getSum('tiktok', 'website clicks')
-          ],
-          color: '#F6AD55'
-        },
-        {
-          type: 'spline',
           name: 'Views',
           data: [
             agg.getSum('google', 'views'),
             agg.getSum('facebook', 'views'),
             agg.getSum('instagram', 'views'),
-            agg.getSum('tiktok', 'views')
+            agg.getSum('tiktok', 'views'),
+            agg.getSum('x', 'views')
           ],
           yAxis: 1,
           color: '#4299E1'
@@ -616,8 +590,8 @@ export default function ReportDashboard () {
         {
           name: 'Users',
           data: [
+            ['Views', agg.getSum('google', 'views')],
             ['Website Clicks', agg.getSum('google', 'website clicks')],
-            ['Landing Page', agg.getSum('google', 'views')],
             ['Calls', agg.getSum('google', 'calls')],
             ['Bookings', agg.getSum('google', 'booking clicks')]
           ]
@@ -625,23 +599,47 @@ export default function ReportDashboard () {
       ]
     },
     {
-      title: { text: 'Monthly Trends for Likes and Followers' },
+      title: { text: 'Likes per Follower (All Platforms)' },
       xAxis: {
-        categories: metrics.map(row => row.period)
+        categories: Array.from(new Set(metrics.map(row => row.period))).sort()
       },
-      yAxis: { title: { text: 'Count' } },
+      yAxis: {
+        title: { text: 'Ratio' },
+        labels: {
+          formatter () {
+            return this.value.toFixed(2)
+          }
+        }
+      },
+      tooltip: {
+        pointFormat: '<b>{point.y:.2f}</b> Likes per Follower'
+      },
       series: [
         {
           type: 'spline',
-          name: 'Likes',
-          data: metrics.map(row => row.metrics['likes'] || 0),
-          color: '#ED64A6'
-        },
-        {
-          type: 'spline',
-          name: 'Followers',
-          data: metrics.map(row => row.metrics['followers'] || 0),
-          color: '#48BB78'
+          name: 'Likes per Follower',
+          color: '#F6AD55',
+          data: (() => {
+            const grouped: Record<
+              string,
+              { likes: number; followers: number }
+            > = {}
+
+            metrics.forEach(row => {
+              const month = row.period
+              const likes = Number(row.metrics['likes'] || 0)
+              const followers = Number(row.metrics['new follows'] || 0)
+              if (!grouped[month]) grouped[month] = { likes: 0, followers: 0 }
+              grouped[month].likes += likes
+              grouped[month].followers += followers
+            })
+
+            return Object.entries(grouped)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([_, { likes, followers }]) =>
+                followers > 0 ? likes / followers : 0
+              )
+          })()
         }
       ]
     },
@@ -676,62 +674,117 @@ export default function ReportDashboard () {
       ]
     },
     {
-      chart: { polar: true, type: 'line' },
+      chart: { type: 'column' },
       title: { text: 'Engagement Quality Overview' },
-      pane: { size: '80%' },
       xAxis: {
         categories: ['Likes', 'Comments', 'Shares', 'Clicks', 'Views'],
-        tickmarkPlacement: 'on',
-        lineWidth: 0
+        title: { text: 'Engagement Metric' }
       },
-      yAxis: { gridLineInterpolation: 'polygon', lineWidth: 0, min: 0 },
+      yAxis: [
+        {
+          title: { text: 'Count (Likes / Comments / Shares / Clicks)' },
+          min: 0
+        },
+        {
+          title: { text: 'Views' },
+          opposite: true,
+          min: 0
+        }
+      ],
+      tooltip: {
+        shared: true
+      },
+      plotOptions: {
+        column: {
+          grouping: false,
+          borderWidth: 0,
+          dataLabels: { enabled: true }
+        }
+      },
       series: [
         {
-          name: 'Engagement',
+          name: 'Likes',
+          data: [totalLikes, null, null, null, null],
+          color: '#ED64A6',
+          pointPlacement: -0.2
+        },
+        {
+          name: 'Comments',
           data: [
-            totalLikes,
+            null,
             agg.getSum('facebook', 'comments') +
               agg.getSum('instagram', 'comments'),
+            null,
+            null,
+            null
+          ],
+          color: '#63B3ED',
+          pointPlacement: -0.1
+        },
+        {
+          name: 'Shares',
+          data: [
+            null,
+            null,
             agg.getSum('facebook', 'shares') +
               agg.getSum('instagram', 'shares'),
+            null,
+            null
+          ],
+          color: '#F6AD55',
+          pointPlacement: 0
+        },
+        {
+          name: 'Clicks',
+          data: [
+            null,
+            null,
+            null,
             agg.getSum('google', 'website clicks') +
               agg.getSum('facebook', 'website clicks'),
-            totalViews
+            null
           ],
-          pointPlacement: 'on',
-          color: '#3182CE'
+          color: '#68D391',
+          pointPlacement: 0.1
+        },
+        {
+          name: 'Views',
+          data: [null, null, null, null, totalViews],
+          yAxis: 1,
+          color: '#3182CE',
+          pointPlacement: 0.2
         }
       ]
     },
     {
-      chart: { type: 'column' },
-      title: { text: 'Monthly Growth in Followers' },
+      chart: { polar: true, type: 'line' },
+      title: { text: 'New Followers Per Platform' },
+      pane: { size: '80%' },
       xAxis: {
-        categories: metrics.map(row => row.period),
-        title: { text: 'Month' }
+        categories: ['Facebook', 'Instagram', 'TikTok', 'X'],
+        tickmarkPlacement: 'on',
+        lineWidth: 0
       },
       yAxis: {
-        title: { text: 'Growth/Drop' },
-        plotLines: [{ value: 0, color: 'gray', width: 1 }]
+        gridLineInterpolation: 'polygon',
+        lineWidth: 0,
+        min: 0
       },
-      tooltip: { shared: true },
-      plotOptions: {
-        column: {
-          dataLabels: { enabled: true },
-          grouping: true,
-          borderWidth: 0
-        }
+      credits: { enabled: false },
+      tooltip: {
+        pointFormat: '<b>{point.y}</b> new follows'
       },
       series: [
         {
-          name: 'Instagram',
-          data: metrics.map(row => row.metrics['instagram_growth'] || 0),
+          name: 'New Followers',
+          data: [
+            agg.getSum('facebook', 'new follows'),
+            agg.getSum('instagram', 'new follows'),
+            agg.getSum('tiktok', 'new follows'),
+            agg.getSum('x', 'new follows')
+          ],
+          pointPlacement: 'on',
           color: '#48BB78'
-        },
-        {
-          name: 'X',
-          data: metrics.map(row => row.metrics['x_growth'] || 0),
-          color: '#F56565'
         }
       ]
     }
@@ -795,7 +848,9 @@ export default function ReportDashboard () {
               extra={
                 <Button
                   size='small'
-                  onClick={() => setExpandedChart({ ...chartConfigs[0] })}
+                  onClick={() =>
+                    setExpandedChart(JSON.parse(JSON.stringify(config)))
+                  }
                 >
                   Expand <MotionIcon style={{ marginLeft: 4 }} />
                 </Button>
