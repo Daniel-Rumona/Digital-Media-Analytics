@@ -482,17 +482,18 @@ export default function ReportDashboard () {
   const closeModal = () => setIsModalOpen(false)
 
   const handleGenerateReport = () => {
-    console.log('Generating')
-    const period = `${dateRange[0].format('MMM YYYY')} - ${dateRange[1].format(
-      'MMM YYYY'
-    )}`
+    const isSameMonth = dateRange[0].isSame(dateRange[1], 'month')
+    const period = isSameMonth
+      ? dateRange[0].format('MMM YYYY')
+      : `${dateRange[0].format('MMM YYYY')} - ${dateRange[1].format(
+          'MMM YYYY'
+        )}`
+
     const platforms = buildAIPayloadFromMetrics(metrics, platformMetricsHistory) // aggregate using main table data
     generateInsights({
       platforms,
       companyName: companyData?.companyName || '',
-      period: `${dateRange[0].format('MMM YYYY')} - ${dateRange[1].format(
-        'MMM YYYY'
-      )}`
+      period
     })
   }
 
