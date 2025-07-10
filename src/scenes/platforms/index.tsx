@@ -206,110 +206,110 @@ const PlatformAnalysis = () => {
     const leftGroup = chartGroups[i]
     const rightGroup = chartGroups[i + 1]
 
-    const makeChartCard = (group, key) => {
-      const series = group.metrics.map((metric, idx) => ({
-        name: metric.charAt(0).toUpperCase() + metric.slice(1),
-        data: months.map(
-          period =>
-            metricDocs.find(doc => doc.period === period)?.metrics?.[metric] ?? 0
-        ),
-        color: group.colors?.[idx] || undefined,
-        yAxis: useSecondaryAxis(metric) ? 1 : 0
-      }))
-      const emptySeries = series.every(s => s.data.every(val => val === 0))
-      const chartConfig = {
-        chart: { type: 'column', backgroundColor: 'transparent' },
-        title: { text: group.title },
-        xAxis: {
-          categories: months.map(m => dayjs(m, 'YYYY-MM').format('MMM YYYY'))
-        },
-      yAxis: [
-  {
-    title: { text: 'Primary Metrics' },
-    labels: { style: { color: '#fff' } }
-  },
-  {
-    title: { text: 'Secondary Metrics' },
-    labels: { style: { color: '#fff' } },
-    opposite: true
-  }
-],
+const makeChartCard = (group, key) => {
+  const primaryMetrics = group.metrics.filter(m => !useSecondaryAxis(m))
+  const secondaryMetrics = group.metrics.filter(m => useSecondaryAxis(m))
 
-        tooltip: { shared: true },
-        legend: { shadow: false },
-        series,
-        plotOptions: { column: { grouping: true, borderWidth: 0 } }
+  const series = group.metrics.map((metric, idx) => ({
+    name: metric.charAt(0).toUpperCase() + metric.slice(1),
+    data: months.map(
+      period =>
+        metricDocs.find(doc => doc.period === period)?.metrics?.[metric] ?? 0
+    ),
+    color: group.colors?.[idx] || undefined,
+    yAxis: useSecondaryAxis(metric) ? 1 : 0
+  }))
+
+  const yAxis = []
+  if (primaryMetrics.length > 0) {
+    yAxis.push({
+      title: {
+        text: primaryMetrics
+          .map(m => m.charAt(0).toUpperCase() + m.slice(1))
+          .join(', '),
+        style: { color: '#fff' }
+      },
+      labels: { style: { color: '#fff' } }
+    })
+  }
+  if (secondaryMetrics.length > 0) {
+    yAxis.push({
+      title: {
+        text: secondaryMetrics
+          .map(m => m.charAt(0).toUpperCase() + m.slice(1))
+          .join(', '),
+        style: { color: '#fff' }
+      },
+      labels: { style: { color: '#fff' } },
+      opposite: true
+    })
+  }
+
+  const emptySeries = series.every(s => s.data.every(val => val === 0))
+
+  const chartConfig = {
+    chart: { type: 'column', backgroundColor: 'transparent' },
+    title: { text: group.title },
+    xAxis: {
+      categories: months.map(m => dayjs(m, 'YYYY-MM').format('MMM YYYY'))
+    },
+    yAxis,
+    tooltip: { shared: true },
+    legend: { shadow: false },
+    series,
+    plotOptions: { column: { grouping: true, borderWidth: 0 } }
+  }
+
+  return (
+    <Card
+      key={group.title}
+      style={{ marginBottom: 24, background: '#2a2a2e', color: '#fff' }}
+      extra={
+        <Flex gap={3}>
+          <Button onClick={() => setExpandedChart(chartConfig)} type='link'>
+            Expand
+          </Button>
+          <Button
+            type='link'
+            onClick={() => {
+              const container = document.createElement('div')
+              document.body.appendChild(container)
+
+              const exportChart = Highcharts.chart(container, {
+                ...chartConfig,
+                chart: {
+                  ...chartConfig.chart,
+                  backgroundColor: '#2a2a2e'
+                }
+              })
+
+              exportChart.exportChart({
+                type: 'image/png',
+                filename: `${group.title.replace(/\s+/g, '_')}_${selectedPlatform}`
+              })
+
+              setTimeout(() => {
+                exportChart.destroy()
+                document.body.removeChild(container)
+              }, 500)
+            }}
+          >
+            Download
+          </Button>
+        </Flex>
       }
-      return (
-        <Card
-          key={group.title}
-          style={{ marginBottom: 24, background: '#2a2a2e', color: '#fff' }}
-       extra={
-  <Flex gap={3}>
-    <Button onClick={() => setExpandedChart(chartConfig)} type='link'>
-      Expand
-    </Button>
-    <Button
-      type='link'
-      onClick={() => {
-        const exportConfig = {
-          chart: {
-            backgroundColor: '#2a2a2e'
-          }
-        }
-        const container = document.createElement('div')
-        document.body.appendChild(container)
-
-        const exportChart = Highcharts.chart(container, {
-          ...chartConfig,
-          chart: {
-            ...chartConfig.chart,
-            backgroundColor: '#2a2a2e'
-          }
-        })
-
-        exportChart.exportChart({
-          type: 'image/png',
-          filename: `${group.title.replace(/\s+/g, '_')}_${selectedPlatform}`
-        })
-
-        setTimeout(() => {
-          exportChart.destroy()
-          document.body.removeChild(container)
-        }, 500)
-      }}
     >
-      Download
-    </Button>
-  </Flex>
+      {emptySeries ? (
+        <span style={{ color: '#999' }}>
+          No data for this chart in range.
+        </span>
+      ) : (
+        <HighchartsReact highcharts={Highcharts} options={chartConfig} />
+      )}
+    </Card>
+  )
 }
-        >
-          {emptySeries ? (
-            <span style={{ color: '#999' }}>
-              No data for this chart in range.
-            </span>
-          ) : (
-            <HighchartsReact highcharts={Highcharts} options={chartConfig} />
-          )}
-        </Card>
-      )
-    }
 
-    if (!rightGroup) {
-      chartCards.push(
-        <Row gutter={[24, 24]} key={leftGroup.title}>
-          <Col span={24}>{makeChartCard(leftGroup, leftGroup.title)}</Col>
-        </Row>
-      )
-    } else {
-      chartCards.push(
-        <Row gutter={[24, 24]} key={leftGroup.title}>
-          <Col span={12}>{makeChartCard(leftGroup, leftGroup.title)}</Col>
-          <Col span={12}>{makeChartCard(rightGroup, rightGroup.title)}</Col>
-        </Row>
-      )
-    }
-  }
 
   return (
     <Box minH='100vh' p={8}>
