@@ -152,38 +152,18 @@ const PlatformAnalysis = () => {
     }
   }, [connectedPlatforms, selectedPlatform])
 
-  const useSecondaryAxis = (metric: string) => {
-    const lowerMetrics = [
-      'posts',
-      'rating',
-      'reviews',
-      'calls',
-      'chat clicks',
-      'directions'
-    ]
+  const useSecondaryAxis = (metric) => {
+    const lowerMetrics = ['posts', 'rating', 'reviews', 'calls', 'chat clicks', 'directions']
     return lowerMetrics.includes(metric)
   }
 
   useEffect(() => {
-    if (
-      !user ||
-      !companyData ||
-      !selectedPlatform ||
-      !selectedRange[0] ||
-      !selectedRange[1]
-    ) {
+    if (!user || !companyData || !selectedPlatform || !selectedRange[0] || !selectedRange[1]) {
       setMetricDocs([])
       return
     }
     setLoading(true)
-    const metricsRef = collection(
-      db,
-      'users',
-      user.uid,
-      'companies',
-      companyData.id,
-      'metrics'
-    )
+    const metricsRef = collection(db, 'users', user.uid, 'companies', companyData.id, 'metrics')
     getDocs(
       query(
         metricsRef,
@@ -206,118 +186,111 @@ const PlatformAnalysis = () => {
 
   const chartGroups = PLATFORM_CHART_GROUPS[selectedPlatform] || []
 
-  // Responsive two-column layout (last full-width if odd)
-  const chartCards = []
-  for (let i = 0; i < chartGroups.length; i += 2) {
-    const leftGroup = chartGroups[i]
-    const rightGroup = chartGroups[i + 1]
+  const makeChartCard = (group, key) => {
+    const primaryMetrics = group.metrics.filter(m => !useSecondaryAxis(m))
+    const secondaryMetrics = group.metrics.filter(m => useSecondaryAxis(m))
 
-    const makeChartCard = (group, key) => {
-      const primaryMetrics = group.metrics.filter(m => !useSecondaryAxis(m))
-      const secondaryMetrics = group.metrics.filter(m => useSecondaryAxis(m))
+    const series = group.metrics.map((metric, idx) => ({
+      name: metric.charAt(0).toUpperCase() + metric.slice(1),
+      data: months.map(
+        period => metricDocs.find(doc => doc.period === period)?.metrics?.[metric] ?? 0
+      ),
+      color: group.colors?.[idx] || undefined,
+      yAxis: useSecondaryAxis(metric) ? 1 : 0
+    }))
 
-      const series = group.metrics.map((metric, idx) => ({
-        name: metric.charAt(0).toUpperCase() + metric.slice(1),
-        data: months.map(
-          period =>
-            metricDocs.find(doc => doc.period === period)?.metrics?.[metric] ??
-            0
-        ),
-        color: group.colors?.[idx] || undefined,
-        yAxis: useSecondaryAxis(metric) ? 1 : 0
-      }))
+    const emptySeries = series.every(s => s.data.every(val => val === 0))
 
-      const yAxis = []
-      if (primaryMetrics.length > 0) {
-        yAxis.push({
-          title: {
-            text: primaryMetrics
-              .map(m => m.charAt(0).toUpperCase() + m.slice(1))
-              .join(', '),
-            style: { color: '#fff' }
-          },
-          labels: { style: { color: '#fff' } }
-        })
-      }
-      if (secondaryMetrics.length > 0) {
-        yAxis.push({
-          title: {
-            text: secondaryMetrics
-              .map(m => m.charAt(0).toUpperCase() + m.slice(1))
-              .join(', '),
-            style: { color: '#fff' }
-          },
-          labels: { style: { color: '#fff' } },
-          opposite: true
-        })
-      }
-
-      const emptySeries = series.every(s => s.data.every(val => val === 0))
-
-      const chartConfig = {
-        chart: { type: 'column', backgroundColor: 'transparent' },
-        title: { text: group.title },
-        xAxis: {
-          categories: months.map(m => dayjs(m, 'YYYY-MM').format('MMM YYYY'))
+    const yAxis = []
+    if (primaryMetrics.length > 0) {
+      yAxis.push({
+        title: {
+          text: primaryMetrics.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(', '),
+          style: { color: '#fff' }
         },
-        yAxis,
-        tooltip: { shared: true },
-        legend: { shadow: false },
-        series,
-        plotOptions: { column: { grouping: true, borderWidth: 0 } }
-      }
+        labels: { style: { color: '#fff' } }
+      })
     }
+    if (secondaryMetrics.length > 0) {
+      yAxis.push({
+        title: {
+          text: secondaryMetrics.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(', '),
+          style: { color: '#fff' }
+        },
+        labels: { style: { color: '#fff' } },
+        opposite: true
+      })
+    }
+
+    const chartConfig = {
+      chart: { type: 'column', backgroundColor: 'transparent' },
+      title: { text: group.title },
+      xAxis: {
+        categories: months.map(m => dayjs(m, 'YYYY-MM').format('MMM YYYY'))
+      },
+      yAxis,
+      tooltip: { shared: true },
+      legend: { shadow: false },
+      series,
+      plotOptions: { column: { grouping: true, borderWidth: 0 } }
+    }
+
     return (
       <Card
         key={group.title}
         style={{ marginBottom: 24, background: '#2a2a2e', color: '#fff' }}
         extra={
           <Flex gap={3}>
-            <Button onClick={() => setExpandedChart(chartConfig)} type='link'>
-              Expand
-            </Button>
+            <Button onClick={() => setExpandedChart(chartConfig)} type='link'>Expand</Button>
             <Button
               type='link'
               onClick={() => {
                 const container = document.createElement('div')
                 document.body.appendChild(container)
-
                 const exportChart = Highcharts.chart(container, {
                   ...chartConfig,
-                  chart: {
-                    ...chartConfig.chart,
-                    backgroundColor: '#2a2a2e'
-                  }
+                  chart: { ...chartConfig.chart, backgroundColor: '#2a2a2e' }
                 })
-
                 exportChart.exportChart({
                   type: 'image/png',
-                  filename: `${group.title.replace(
-                    /\s+/g,
-                    '_'
-                  )}_${selectedPlatform}`
+                  filename: `${group.title.replace(/\s+/g, '_')}_${selectedPlatform}`
                 })
-
                 setTimeout(() => {
                   exportChart.destroy()
                   document.body.removeChild(container)
                 }, 500)
               }}
-            >
-              Download
-            </Button>
+            >Download</Button>
           </Flex>
         }
       >
         {emptySeries ? (
-          <span style={{ color: '#999' }}>
-            No data for this chart in range.
-          </span>
+          <span style={{ color: '#999' }}>No data for this chart in range.</span>
         ) : (
           <HighchartsReact highcharts={Highcharts} options={chartConfig} />
         )}
       </Card>
     )
+  }
+
+  const chartCards = []
+  for (let i = 0; i < chartGroups.length; i += 2) {
+    const leftGroup = chartGroups[i]
+    const rightGroup = chartGroups[i + 1]
+    if (!rightGroup) {
+      chartCards.push(
+        <Row gutter={[24, 24]} key={leftGroup.title}>
+          <Col span={24}>{makeChartCard(leftGroup, leftGroup.title)}</Col>
+        </Row>
+      )
+    } else {
+      chartCards.push(
+        <Row gutter={[24, 24]} key={leftGroup.title}>
+          <Col span={12}>{makeChartCard(leftGroup, leftGroup.title)}</Col>
+          <Col span={12}>{makeChartCard(rightGroup, rightGroup.title)}</Col>
+        </Row>
+      )
+    }
   }
 
   return (
