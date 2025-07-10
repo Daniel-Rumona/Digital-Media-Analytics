@@ -787,11 +787,16 @@ const chartConfigs: HighchartsOptions[] = [
     chart: { polar: true, type: 'line' },
     title: { text: 'New Followers Per Platform' },
     pane: { size: '80%' },
-    xAxis: {
-      categories: ['Facebook', 'Instagram', 'TikTok', 'X'],
-      tickmarkPlacement: 'on',
-      lineWidth: 0
-    },
+   xAxis: {
+    categories: connectedPlatforms
+      .filter(pf => agg.getSum(pf, 'new follows') > 0) // Only show platforms with follows
+      .map(pf => pf.charAt(0).toUpperCase() + pf.slice(1)), // Capitalize
+    tickmarkPlacement: 'on',
+    lineWidth: 0,
+    labels: {
+      style: { color: '#fff' } // White text for dark theme
+    }
+  },
     yAxis: {
       gridLineInterpolation: 'polygon',
       lineWidth: 0,
