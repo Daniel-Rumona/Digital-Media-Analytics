@@ -74,8 +74,8 @@ const PLATFORM_CHART_GROUPS = {
   ],
   instagram: [
     {
-      title: 'Views & Likes',
-      metrics: ['views', 'likes'],
+      title: 'Views & Interactions',
+      metrics: ['views', 'content interactions'],
       colors: ['#E1306C', '#405DE6']
     },
     {
