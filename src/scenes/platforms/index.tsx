@@ -52,8 +52,8 @@ const PLATFORM_CHART_GROUPS = {
   ],
   facebook: [
     {
-      title: 'Views & Likes',
-      metrics: ['views', 'likes'],
+      title: 'Views & Interactions',
+      metrics: ['views', 'content interactions'],
       colors: ['#3B5998', '#FF69B4']
     },
     {
@@ -152,6 +152,12 @@ const PlatformAnalysis = () => {
     }
   }, [connectedPlatforms, selectedPlatform])
 
+  const useSecondaryAxis = (metric: string) => {
+  const lowerMetrics = ['posts', 'rating', 'reviews', 'calls', 'chat clicks', 'directions']
+  return lowerMetrics.includes(metric)
+}
+
+
   useEffect(() => {
     if (
       !user ||
@@ -202,14 +208,15 @@ const PlatformAnalysis = () => {
 
     const makeChartCard = (group, key) => {
       const series = group.metrics.map((metric, idx) => ({
-        name: metric.charAt(0).toUpperCase() + metric.slice(1),
-        data: months.map(
-          period =>
-            metricDocs.find(doc => doc.period === period)?.metrics?.[metric] ??
-            0
-        ),
-        color: group.colors?.[idx] || undefined
-      }))
+      const series = group.metrics.map((metric, idx) => ({
+  name: metric.charAt(0).toUpperCase() + metric.slice(1),
+  data: months.map(
+    period =>
+      metricDocs.find(doc => doc.period === period)?.metrics?.[metric] ?? 0
+  ),
+  color: group.colors?.[idx] || undefined,
+  yAxis: useSecondaryAxis(metric) ? 1 : 0
+}))
       const emptySeries = series.every(s => s.data.every(val => val === 0))
       const chartConfig = {
         chart: { type: 'column', backgroundColor: 'transparent' },
@@ -217,7 +224,18 @@ const PlatformAnalysis = () => {
         xAxis: {
           categories: months.map(m => dayjs(m, 'YYYY-MM').format('MMM YYYY'))
         },
-        yAxis: { min: 0 },
+      yAxis: [
+  {
+    title: { text: 'Primary Metrics' },
+    labels: { style: { color: '#fff' } }
+  },
+  {
+    title: { text: 'Secondary Metrics' },
+    labels: { style: { color: '#fff' } },
+    opposite: true
+  }
+],
+
         tooltip: { shared: true },
         legend: { shadow: false },
         series,
