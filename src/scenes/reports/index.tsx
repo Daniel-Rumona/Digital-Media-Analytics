@@ -787,14 +787,14 @@ const chartConfigs: HighchartsOptions[] = [
     chart: { polar: true, type: 'line' },
     title: { text: 'New Followers Per Platform' },
     pane: { size: '80%' },
-   xAxis: {
-    categories: connectedPlatforms
-      .filter(pf => agg.getSum(pf, 'new follows')) // Only show platforms with follows
-      .map(pf => pf.charAt(0).toUpperCase() + pf.slice(1)), // Capitalize
-    tickmarkPlacement: 'on',
+    xAxis: {
+    categories: connectedPlatforms.map(pf => 
+      pf.charAt(0).toUpperCase() + pf.slice(1)
+    ),
     lineWidth: 0,
+    tickmarkPlacement: 'on',
     labels: {
-      style: { color: '#fff' } // White text for dark theme
+      style: { color: '#fff' }
     }
   },
     yAxis: {
