@@ -789,7 +789,7 @@ const chartConfigs: HighchartsOptions[] = [
     pane: { size: '80%' },
    xAxis: {
     categories: connectedPlatforms
-      .filter(pf => agg.getSum(pf, 'new follows') > 0) // Only show platforms with follows
+      .filter(pf => agg.getSum(pf, 'new follows')) // Only show platforms with follows
       .map(pf => pf.charAt(0).toUpperCase() + pf.slice(1)), // Capitalize
     tickmarkPlacement: 'on',
     lineWidth: 0,
