@@ -152,10 +152,6 @@ const PlatformAnalysis = () => {
     }
   }, [connectedPlatforms, selectedPlatform])
 
-  const useSecondaryAxis = (metric) => {
-    const lowerMetrics = ['posts', 'rating', 'reviews', 'calls', 'chat clicks', 'directions']
-    return lowerMetrics.includes(metric)
-  }
 
   useEffect(() => {
     if (!user || !companyData || !selectedPlatform || !selectedRange[0] || !selectedRange[1]) {
@@ -187,17 +183,39 @@ const PlatformAnalysis = () => {
   const chartGroups = PLATFORM_CHART_GROUPS[selectedPlatform] || []
 
   const makeChartCard = (group, key) => {
-    const primaryMetrics = group.metrics.filter(m => !useSecondaryAxis(m))
-    const secondaryMetrics = group.metrics.filter(m => useSecondaryAxis(m))
+    // 1. Gather all values per metric
+const allMetricValues = group.metrics.map(metric => {
+  return {
+    metric,
+    values: months.map(
+      period =>
+        metricDocs.find(doc => doc.period === period)?.metrics?.[metric] ?? 0
+    )
+  }
+})
 
-    const series = group.metrics.map((metric, idx) => ({
-      name: metric.charAt(0).toUpperCase() + metric.slice(1),
-      data: months.map(
-        period => metricDocs.find(doc => doc.period === period)?.metrics?.[metric] ?? 0
-      ),
-      color: group.colors?.[idx] || undefined,
-      yAxis: useSecondaryAxis(metric) ? 1 : 0
-    }))
+// 2. Compute max per metric
+const metricMaxMap = Object.fromEntries(
+  allMetricValues.map(m => [m.metric, Math.max(...m.values)])
+)
+
+// 3. Compute global max
+const globalMax = Math.max(...Object.values(metricMaxMap))
+
+// 4. Threshold logic: assign to secondary if max is < 30% of globalMax
+const isSecondary = (metric) =>
+  metricMaxMap[metric] < globalMax * 0.3
+
+    const primaryMetrics = group.metrics.filter(m => !isSecondary(m))
+const secondaryMetrics = group.metrics.filter(m => isSecondary(m))
+
+
+   const series = group.metrics.map((metric, idx) => ({
+  name: metric.charAt(0).toUpperCase() + metric.slice(1),
+  data: allMetricValues.find(m => m.metric === metric)?.values || [],
+  color: group.colors?.[idx] || undefined,
+  yAxis: isSecondary(metric) ? 1 : 0
+}))
 
     const emptySeries = series.every(s => s.data.every(val => val === 0))
 
