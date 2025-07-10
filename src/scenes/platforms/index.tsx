@@ -208,15 +208,14 @@ const PlatformAnalysis = () => {
 
     const makeChartCard = (group, key) => {
       const series = group.metrics.map((metric, idx) => ({
-      const series = group.metrics.map((metric, idx) => ({
-  name: metric.charAt(0).toUpperCase() + metric.slice(1),
-  data: months.map(
-    period =>
-      metricDocs.find(doc => doc.period === period)?.metrics?.[metric] ?? 0
-  ),
-  color: group.colors?.[idx] || undefined,
-  yAxis: useSecondaryAxis(metric) ? 1 : 0
-}))
+        name: metric.charAt(0).toUpperCase() + metric.slice(1),
+        data: months.map(
+          period =>
+            metricDocs.find(doc => doc.period === period)?.metrics?.[metric] ?? 0
+        ),
+        color: group.colors?.[idx] || undefined,
+        yAxis: useSecondaryAxis(metric) ? 1 : 0
+      }))
       const emptySeries = series.every(s => s.data.every(val => val === 0))
       const chartConfig = {
         chart: { type: 'column', backgroundColor: 'transparent' },
