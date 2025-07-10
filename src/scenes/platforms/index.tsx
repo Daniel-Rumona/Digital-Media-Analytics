@@ -114,7 +114,7 @@ const PLATFORM_CHART_GROUPS = {
   x: [
     {
       title: 'New Follows, Posts & Views',
-      metrics: ['new follows', 'posts', 'post views'],
+      metrics: ['new follows', 'posts', 'views'],
       colors: ['#1DA1F2', '#657786', '#AAB8C2']
     },
     {
