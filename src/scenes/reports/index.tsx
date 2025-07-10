@@ -42,6 +42,14 @@ import {
   Media,
   ImageRun
 } from 'docx'
+import {
+  FiBarChart2,
+  FiThumbsUp,
+  FiEdit,
+  FiDownload,
+  FiLink,
+  FiMaximize2
+} from 'react-icons/fi'
 import { saveAs } from 'file-saver'
 import dayjs, { Dayjs } from 'dayjs'
 import HighchartsExporting from 'highcharts/modules/exporting'
@@ -573,251 +581,242 @@ export default function ReportDashboard () {
     }
   ]
 
-  const chartConfigs: HighchartsOptions[] = [
-    {
-      chart: { zoomType: 'xy' },
-      title: { text: 'Platform Metrics with View Trends', color: '#fff' },
-      xAxis: [
-        { categories: ['Google', 'Facebook', 'Instagram', 'TikTok', 'X'] }
-      ],
-      yAxis: [
-        { title: { text: 'Counts' } },
-        { title: { text: 'Views' }, opposite: true }
-      ],
-      tooltip: { shared: true },
-      series: [
-        {
-          type: 'column',
-          name: 'Views',
-          data: [
-            agg.getSum('google', 'views'),
-            agg.getSum('facebook', 'views'),
-            agg.getSum('instagram', 'views'),
-            agg.getSum('tiktok', 'views'),
-            agg.getSum('x', 'views')
-          ],
-          yAxis: 1,
-          color: '#4299E1'
-        }
-      ]
+const chartConfigs: HighchartsOptions[] = [
+  {
+    chart: { zoomType: 'xy' },
+    title: { text: 'Platform Metrics with View Trends', color: '#fff' },
+    xAxis: [{ categories: ['Google', 'Facebook', 'Instagram', 'TikTok', 'X'] }],
+    yAxis: [
+      { title: { text: 'Counts' } },
+      { title: { text: 'Views' }, opposite: true }
+    ],
+    tooltip: { shared: true },
+    series: [
+      {
+        type: 'column',
+        name: 'Views',
+        data: [
+          agg.getSum('google', 'views'),
+          agg.getSum('facebook', 'views'),
+          agg.getSum('instagram', 'views'),
+          agg.getSum('tiktok', 'post views'), // ✅ FIXED
+          agg.getSum('x', 'views')            // ✅ Ensured lowercase key
+        ],
+        yAxis: 1,
+        color: '#4299E1'
+      }
+    ]
+  },
+  {
+    chart: { type: 'funnel' },
+    title: { text: 'Conversion Funnel' },
+    plotOptions: {
+      series: {
+        dataLabels: {
+          enabled: true,
+          format: '<b>{point.name}</b>: {point.y}',
+          softConnector: true
+        },
+        center: ['50%', '50%'],
+        width: '80%'
+      }
     },
-    {
-      chart: { type: 'funnel' },
-      title: { text: 'Conversion Funnel' },
-      plotOptions: {
-        series: {
-          dataLabels: {
-            enabled: true,
-            format: '<b>{point.name}</b>: {point.y}',
-            softConnector: true
+    series: [
+      {
+        name: 'Users',
+        data: [
+          ['Views', agg.getSum('google', 'views')],
+          ['Website Clicks', agg.getSum('google', 'website clicks')],
+          ['Calls', agg.getSum('google', 'calls')],
+          ['Bookings', agg.getSum('google', 'booking clicks')]
+        ]
+      }
+    ]
+  },
+  {
+    title: { text: 'Likes per Follower (All Platforms)' },
+    xAxis: {
+      categories: Array.from(new Set(metrics.map(row => row.period))).sort()
+    },
+    yAxis: {
+      title: { text: 'Ratio' },
+      labels: {
+        formatter () {
+          return this.value.toFixed(2)
+        }
+      }
+    },
+    tooltip: {
+      pointFormat: '<b>{point.y:.2f}</b> Likes per Follower'
+    },
+    series: [
+      {
+        type: 'spline',
+        name: 'Likes per Follower',
+        color: '#F6AD55',
+        data: (() => {
+          const grouped: Record<string, { likes: number; followers: number }> = {}
+          metrics.forEach(row => {
+            const month = row.period
+            const likes = Number(row.metrics['likes'] || 0)
+            const followers = Number(row.metrics['new follows'] || 0)
+            if (!grouped[month]) grouped[month] = { likes: 0, followers: 0 }
+            grouped[month].likes += likes
+            grouped[month].followers += followers
+          })
+          return Object.entries(grouped)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([_, { likes, followers }]) =>
+              followers > 0 ? likes / followers : 0
+            )
+        })()
+      }
+    ]
+  },
+  {
+    chart: { type: 'pie' },
+    title: { text: 'Engagement Distribution' },
+    series: [
+      {
+        name: 'Engagement',
+        data: [
+          { name: 'Likes', y: totalLikes },
+          {
+            name: 'Clicks',
+            y:
+              agg.getSum('google', 'website clicks') +
+              agg.getSum('facebook', 'website clicks')
           },
-          center: ['50%', '50%'],
-          width: '80%'
-        }
-      },
-      series: [
-        {
-          name: 'Users',
-          data: [
-            ['Views', agg.getSum('google', 'views')],
-            ['Website Clicks', agg.getSum('google', 'website clicks')],
-            ['Calls', agg.getSum('google', 'calls')],
-            ['Bookings', agg.getSum('google', 'booking clicks')]
-          ]
-        }
-      ]
-    },
-    {
-      title: { text: 'Likes per Follower (All Platforms)' },
-      xAxis: {
-        categories: Array.from(new Set(metrics.map(row => row.period))).sort()
-      },
-      yAxis: {
-        title: { text: 'Ratio' },
-        labels: {
-          formatter () {
-            return this.value.toFixed(2)
+          {
+            name: 'Comments',
+            y:
+              agg.getSum('facebook', 'comments') +
+              agg.getSum('instagram', 'comments')
+          },
+          {
+            name: 'Shares',
+            y:
+              agg.getSum('facebook', 'shares') +
+              agg.getSum('instagram', 'shares')
           }
-        }
-      },
-      tooltip: {
-        pointFormat: '<b>{point.y:.2f}</b> Likes per Follower'
-      },
-      series: [
-        {
-          type: 'spline',
-          name: 'Likes per Follower',
-          color: '#F6AD55',
-          data: (() => {
-            const grouped: Record<
-              string,
-              { likes: number; followers: number }
-            > = {}
-
-            metrics.forEach(row => {
-              const month = row.period
-              const likes = Number(row.metrics['likes'] || 0)
-              const followers = Number(row.metrics['new follows'] || 0)
-              if (!grouped[month]) grouped[month] = { likes: 0, followers: 0 }
-              grouped[month].likes += likes
-              grouped[month].followers += followers
-            })
-
-            return Object.entries(grouped)
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([_, { likes, followers }]) =>
-                followers > 0 ? likes / followers : 0
-              )
-          })()
-        }
-      ]
+        ]
+      }
+    ]
+  },
+  {
+    chart: { type: 'column' },
+    title: { text: 'Engagement Quality Overview' },
+    xAxis: {
+      categories: ['Likes', 'Comments', 'Shares', 'Clicks', 'Views'],
+      title: { text: 'Engagement Metric' }
     },
-    {
-      chart: { type: 'pie' },
-      title: { text: 'Engagement Distribution' },
-      series: [
-        {
-          name: 'Engagement',
-          data: [
-            { name: 'Likes', y: totalLikes },
-            {
-              name: 'Clicks',
-              y:
-                agg.getSum('google', 'website clicks') +
-                agg.getSum('facebook', 'website clicks')
-            },
-            {
-              name: 'Comments',
-              y:
-                agg.getSum('facebook', 'comments') +
-                agg.getSum('instagram', 'comments')
-            },
-            {
-              name: 'Shares',
-              y:
-                agg.getSum('facebook', 'shares') +
-                agg.getSum('instagram', 'shares')
-            }
-          ]
-        }
-      ]
-    },
-    {
-      chart: { type: 'column' },
-      title: { text: 'Engagement Quality Overview' },
-      xAxis: {
-        categories: ['Likes', 'Comments', 'Shares', 'Clicks', 'Views'],
-        title: { text: 'Engagement Metric' }
-      },
-      yAxis: [
-        {
-          title: { text: 'Count (Likes / Comments / Shares / Clicks)' },
-          min: 0
-        },
-        {
-          title: { text: 'Views' },
-          opposite: true,
-          min: 0
-        }
-      ],
-      tooltip: {
-        shared: true
-      },
-      plotOptions: {
-        column: {
-          grouping: false,
-          borderWidth: 0,
-          dataLabels: { enabled: true }
-        }
-      },
-      series: [
-        {
-          name: 'Likes',
-          data: [totalLikes, null, null, null, null],
-          color: '#ED64A6',
-          pointPlacement: -0.2
-        },
-        {
-          name: 'Comments',
-          data: [
-            null,
-            agg.getSum('facebook', 'comments') +
-              agg.getSum('instagram', 'comments'),
-            null,
-            null,
-            null
-          ],
-          color: '#63B3ED',
-          pointPlacement: -0.1
-        },
-        {
-          name: 'Shares',
-          data: [
-            null,
-            null,
-            agg.getSum('facebook', 'shares') +
-              agg.getSum('instagram', 'shares'),
-            null,
-            null
-          ],
-          color: '#F6AD55',
-          pointPlacement: 0
-        },
-        {
-          name: 'Clicks',
-          data: [
-            null,
-            null,
-            null,
-            agg.getSum('google', 'website clicks') +
-              agg.getSum('facebook', 'website clicks'),
-            null
-          ],
-          color: '#68D391',
-          pointPlacement: 0.1
-        },
-        {
-          name: 'Views',
-          data: [null, null, null, null, totalViews],
-          yAxis: 1,
-          color: '#3182CE',
-          pointPlacement: 0.2
-        }
-      ]
-    },
-    {
-      chart: { polar: true, type: 'line' },
-      title: { text: 'New Followers Per Platform' },
-      pane: { size: '80%' },
-      xAxis: {
-        categories: ['Facebook', 'Instagram', 'TikTok', 'X'],
-        tickmarkPlacement: 'on',
-        lineWidth: 0
-      },
-      yAxis: {
-        gridLineInterpolation: 'polygon',
-        lineWidth: 0,
+    yAxis: [
+      {
+        title: { text: 'Count (Likes / Comments / Shares / Clicks)' },
         min: 0
       },
-      credits: { enabled: false },
-      tooltip: {
-        pointFormat: '<b>{point.y}</b> new follows'
+      {
+        title: { text: 'Views' },
+        opposite: true,
+        min: 0
+      }
+    ],
+    tooltip: { shared: true },
+    plotOptions: {
+      column: {
+        grouping: false,
+        borderWidth: 0,
+        dataLabels: { enabled: true }
+      }
+    },
+    series: [
+      {
+        name: 'Likes',
+        data: [totalLikes, null, null, null, null],
+        color: '#ED64A6',
+        pointPlacement: -0.2
       },
-      series: [
-        {
-          name: 'New Followers',
-          data: [
-            agg.getSum('facebook', 'new follows'),
-            agg.getSum('instagram', 'new follows'),
-            agg.getSum('tiktok', 'new follows'),
-            agg.getSum('x', 'new follows')
-          ],
-          pointPlacement: 'on',
-          color: '#48BB78'
-        }
-      ]
-    }
-  ]
+      {
+        name: 'Comments',
+        data: [
+          null,
+          agg.getSum('facebook', 'comments') +
+            agg.getSum('instagram', 'comments'),
+          null,
+          null,
+          null
+        ],
+        color: '#63B3ED',
+        pointPlacement: -0.1
+      },
+      {
+        name: 'Shares',
+        data: [
+          null,
+          null,
+          agg.getSum('facebook', 'shares') +
+            agg.getSum('instagram', 'shares'),
+          null,
+          null
+        ],
+        color: '#F6AD55',
+        pointPlacement: 0
+      },
+      {
+        name: 'Clicks',
+        data: [
+          null,
+          null,
+          null,
+          agg.getSum('google', 'website clicks') +
+            agg.getSum('facebook', 'website clicks'),
+          null
+        ],
+        color: '#68D391',
+        pointPlacement: 0.1
+      },
+      {
+        name: 'Views',
+        data: [null, null, null, null, totalViews],
+        yAxis: 1,
+        color: '#3182CE',
+        pointPlacement: 0.2
+      }
+    ]
+  },
+  {
+    chart: { polar: true, type: 'line' },
+    title: { text: 'New Followers Per Platform' },
+    pane: { size: '80%' },
+    xAxis: {
+      categories: ['Facebook', 'Instagram', 'TikTok', 'X'],
+      tickmarkPlacement: 'on',
+      lineWidth: 0
+    },
+    yAxis: {
+      gridLineInterpolation: 'polygon',
+      lineWidth: 0,
+      min: 0
+    },
+    credits: { enabled: false },
+    tooltip: {
+      pointFormat: '<b>{point.y}</b> new follows'
+    },
+    series: [
+      {
+        name: 'New Followers',
+        data: [
+          agg.getSum('facebook', 'new follows'),
+          agg.getSum('instagram', 'new follows'),
+          agg.getSum('tiktok', 'new follows'),
+          agg.getSum('x', 'new follows')
+        ],
+        pointPlacement: 'on',
+        color: '#48BB78'
+      }
+    ]
+  }
+]
 
   return (
     <Box style={{ minHeight: '100vh', padding: 32, background: '#191A1F' }}>
@@ -874,24 +873,31 @@ export default function ReportDashboard () {
                   {chartConfigs[0]?.title?.text || `Chart 1`}
                 </Text>
               }
-            extra={
-  <Flex gap={3}>
-    <Button onClick={() => setExpandedChart(chartConfig)} type='link'>
-      Expand
-    </Button>
-    <Button
-      type='link'
-      onClick={() =>
-        exportChartToImage(
-          chartConfig,
-          `${group.title.replace(/\s+/g, '_')}_${selectedPlatform}`
-        )
-      }
-    >
-      Download
-    </Button>
-  </Flex>
-}
+              extra={
+            <Flex gap={6}>
+              <Button
+                size='small'
+                icon={<FiMaximize2 />}
+                onClick={() => setExpandedChart({ ...config })}
+              >
+                Expand
+              </Button>
+              <Button
+                size='small'
+                icon={<FiDownload />}
+                onClick={() =>
+                  exportChartToImage(
+                    config,
+                    `${(config.title?.text || `chart_${idx + 1}`)
+                      .replace(/\s+/g, '_')
+                      .toLowerCase()}`
+                  )
+                }
+              >
+                Download
+              </Button>
+            </Flex>
+          }
 
               hoverable
             >
@@ -914,14 +920,31 @@ export default function ReportDashboard () {
                   {chartConfigs[1]?.title?.text || `Chart 2`}
                 </Text>
               }
-              extra={
-                <Button
-                  size='small'
-                  onClick={() => setExpandedChart({ ...chartConfigs[1] })}
-                >
-                  Expand <MotionIcon style={{ marginLeft: 4 }} />
-                </Button>
-              }
+            extra={
+            <Flex gap={6}>
+              <Button
+                size='small'
+                icon={<FiMaximize2 />}
+                onClick={() => setExpandedChart({ ...config })}
+              >
+                Expand
+              </Button>
+              <Button
+                size='small'
+                icon={<FiDownload />}
+                onClick={() =>
+                  exportChartToImage(
+                    config,
+                    `${(config.title?.text || `chart_${idx + 1}`)
+                      .replace(/\s+/g, '_')
+                      .toLowerCase()}`
+                  )
+                }
+              >
+                Download
+              </Button>
+            </Flex>
+          }
               hoverable
             >
               <HighchartsReact
@@ -944,14 +967,31 @@ export default function ReportDashboard () {
                     {config?.title?.text || `Chart ${idx + 3}`}
                   </Text>
                 }
-                extra={
-                  <Button
-                    size='small'
-                    onClick={() => setExpandedChart({ ...config })}
-                  >
-                    Expand <MotionIcon style={{ marginLeft: 4 }} />
-                  </Button>
+               extra={
+            <Flex gap={6}>
+              <Button
+                size='small'
+                icon={<FiMaximize2 />}
+                onClick={() => setExpandedChart({ ...config })}
+              >
+                Expand
+              </Button>
+              <Button
+                size='small'
+                icon={<FiDownload />}
+                onClick={() =>
+                  exportChartToImage(
+                    config,
+                    `${(config.title?.text || `chart_${idx + 1}`)
+                      .replace(/\s+/g, '_')
+                      .toLowerCase()}`
+                  )
                 }
+              >
+                Download
+              </Button>
+            </Flex>
+          }
                 hoverable
               >
                 <HighchartsReact highcharts={Highcharts} options={config} />
