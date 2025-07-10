@@ -114,7 +114,7 @@ const PLATFORM_CHART_GROUPS = {
   x: [
     {
       title: 'New Follows, Posts & Views',
-      metrics: ['new follows', 'posts', 'views'],
+      metrics: ['new follows', 'posts', 'post views'],
       colors: ['#1DA1F2', '#657786', '#AAB8C2']
     },
     {
@@ -227,11 +227,45 @@ const PlatformAnalysis = () => {
         <Card
           key={group.title}
           style={{ marginBottom: 24, background: '#2a2a2e', color: '#fff' }}
-          extra={
-            <Button onClick={() => setExpandedChart(chartConfig)} type='link'>
-              Expand
-            </Button>
+       extra={
+  <Flex gap={3}>
+    <Button onClick={() => setExpandedChart(chartConfig)} type='link'>
+      Expand
+    </Button>
+    <Button
+      type='link'
+      onClick={() => {
+        const exportConfig = {
+          chart: {
+            backgroundColor: '#2a2a2e'
           }
+        }
+        const container = document.createElement('div')
+        document.body.appendChild(container)
+
+        const exportChart = Highcharts.chart(container, {
+          ...chartConfig,
+          chart: {
+            ...chartConfig.chart,
+            backgroundColor: '#2a2a2e'
+          }
+        })
+
+        exportChart.exportChart({
+          type: 'image/png',
+          filename: `${group.title.replace(/\s+/g, '_')}_${selectedPlatform}`
+        })
+
+        setTimeout(() => {
+          exportChart.destroy()
+          document.body.removeChild(container)
+        }, 500)
+      }}
+    >
+      Download
+    </Button>
+  </Flex>
+}
         >
           {emptySeries ? (
             <span style={{ color: '#999' }}>
