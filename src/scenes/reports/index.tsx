@@ -12,14 +12,6 @@ import {
   Spin,
   Alert
 } from 'antd'
-import {
-  FiBarChart2,
-  FiThumbsUp,
-  FiEdit,
-  FiDownload,
-  FiLink,
-  FiMaximize2
-} from 'react-icons/fi'
 import Highcharts from 'highcharts'
 import type { Options as HighchartsOptions } from 'highcharts'
 import HighchartsReact from 'highcharts-react-official'
@@ -106,8 +98,8 @@ Highcharts.setOptions({
 })
 
 // Chart refs
-const consolidatedChartRef = createRef<any>()
-const funnelChartRef = createRef<any>()
+const consolidatedChartRef = createRef<HighchartsReact.RefObject>()
+const funnelChartRef = createRef<HighchartsReact.RefObject>()
 
 function base64ToArrayBuffer (dataUrl: string) {
   const base64 = dataUrl.split(',')[1]
@@ -347,6 +339,12 @@ export default function ReportDashboard () {
   const reportRef = useRef<HTMLDivElement | null>(null)
   const { companyData, user } = useCompanyData()
   const [metrics, setMetrics] = useState<MetricsRecord[]>([])
+const connectedPlatforms = useMemo(() => {
+  if (!companyData?.accounts) return []
+  return companyData.accounts
+    .map(acc => acc.platform.toLowerCase())
+    .filter((v, i, a) => !!v && a.indexOf(v) === i)
+}, [companyData])
   const {
     insights: modalReport,
     loading: modalLoading,
@@ -541,16 +539,16 @@ export default function ReportDashboard () {
     return { platforms, getSum }
   }, [metrics])
 
- const totalViews = ['google', 'facebook', 'instagram', 'tiktok', 'x'].reduce(
+const totalViews = connectedPlatforms.reduce(
   (sum, pf) =>
     sum +
     (pf === 'tiktok'
-      ? agg.getSum(pf, 'post views') // FIX: TikTok uses 'post views'
+      ? agg.getSum(pf, 'post views')
       : agg.getSum(pf, 'views')),
   0
 )
 
-  const totalLikes = ['facebook', 'instagram', 'tiktok', 'x'].reduce(
+  const totalLikes = connectedPlatforms.reduce(
     (sum, pf) => sum + agg.getSum(pf, 'likes'),
     0
   )
@@ -585,7 +583,10 @@ const chartConfigs: HighchartsOptions[] = [
   {
     chart: { zoomType: 'xy' },
     title: { text: 'Platform Metrics with View Trends', color: '#fff' },
-    xAxis: [{ categories: ['Google', 'Facebook', 'Instagram', 'TikTok', 'X'] }],
+    xAxis: [{ 
+    categories: connectedPlatforms.map(pf => 
+      pf.charAt(0).toUpperCase() + pf.slice(1))
+  }],
     yAxis: [
       { title: { text: 'Counts' } },
       { title: { text: 'Views' }, opposite: true }
@@ -595,13 +596,11 @@ const chartConfigs: HighchartsOptions[] = [
       {
         type: 'column',
         name: 'Views',
-        data: [
-          agg.getSum('google', 'views'),
-          agg.getSum('facebook', 'views'),
-          agg.getSum('instagram', 'views'),
-          agg.getSum('tiktok', 'post views'), // ✅ FIXED
-          agg.getSum('x', 'views')            // ✅ Ensured lowercase key
-        ],
+        data: connectedPlatforms.map(pf =>
+        pf === 'tiktok'
+          ? agg.getSum(pf, 'post views')
+          : agg.getSum(pf, 'views')
+      ),
         yAxis: 1,
         color: '#4299E1'
       }
@@ -878,7 +877,7 @@ const chartConfigs: HighchartsOptions[] = [
               <Button
                 size='small'
                 icon={<FiMaximize2 />}
-                onClick={() => setExpandedChart({ ...config })}
+                onClick={() => setExpandedChart(chartConfigs[0])}
               >
                 Expand
               </Button>
@@ -886,13 +885,11 @@ const chartConfigs: HighchartsOptions[] = [
                 size='small'
                 icon={<FiDownload />}
                 onClick={() =>
-                  exportChartToImage(
-                    config,
-                    `${(config.title?.text || `chart_${idx + 1}`)
-                      .replace(/\s+/g, '_')
-                      .toLowerCase()}`
-                  )
-                }
+            exportChartToImage(
+              chartConfigs[0],
+              "platform_metrics_view"
+            )
+          }
               >
                 Download
               </Button>
@@ -920,31 +917,29 @@ const chartConfigs: HighchartsOptions[] = [
                   {chartConfigs[1]?.title?.text || `Chart 2`}
                 </Text>
               }
-            extra={
-            <Flex gap={6}>
-              <Button
-                size='small'
-                icon={<FiMaximize2 />}
-                onClick={() => setExpandedChart({ ...config })}
-              >
-                Expand
-              </Button>
-              <Button
-                size='small'
-                icon={<FiDownload />}
-                onClick={() =>
-                  exportChartToImage(
-                    config,
-                    `${(config.title?.text || `chart_${idx + 1}`)
-                      .replace(/\s+/g, '_')
-                      .toLowerCase()}`
-                  )
-                }
-              >
-                Download
-              </Button>
-            </Flex>
-          }
+extra={
+  <Flex gap={6}>
+    <Button
+      size='small'
+      icon={<FiMaximize2 />}
+      onClick={() => setExpandedChart(chartConfigs[1])}
+    >
+      Expand
+    </Button>
+    <Button
+      size='small'
+      icon={<FiDownload />}
+      onClick={() =>
+        exportChartToImage(
+          chartConfigs[1],
+          "conversion_funnel"
+        )
+      }
+    >
+      Download
+    </Button>
+  </Flex>
+}
               hoverable
             >
               <HighchartsReact
@@ -968,30 +963,30 @@ const chartConfigs: HighchartsOptions[] = [
                   </Text>
                 }
                extra={
-            <Flex gap={6}>
-              <Button
-                size='small'
-                icon={<FiMaximize2 />}
-                onClick={() => setExpandedChart({ ...config })}
-              >
-                Expand
-              </Button>
-              <Button
-                size='small'
-                icon={<FiDownload />}
-                onClick={() =>
-                  exportChartToImage(
-                    config,
-                    `${(config.title?.text || `chart_${idx + 1}`)
-                      .replace(/\s+/g, '_')
-                      .toLowerCase()}`
-                  )
-                }
-              >
-                Download
-              </Button>
-            </Flex>
-          }
+  <Flex gap={6}>
+    <Button
+      size='small'
+      icon={<FiMaximize2 />}
+      onClick={() => setExpandedChart(config)}
+    >
+      Expand
+    </Button>
+    <Button
+      size='small'
+      icon={<FiDownload />}
+      onClick={() =>
+        exportChartToImage(
+          config,
+          `${(config.title?.text || `chart_${idx + 3}`)
+            .replace(/\s+/g, '_')
+            .toLowerCase()}`
+        )
+      }
+    >
+      Download
+    </Button>
+  </Flex>
+}
                 hoverable
               >
                 <HighchartsReact highcharts={Highcharts} options={config} />
