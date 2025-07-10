@@ -496,6 +496,29 @@ export default function ReportDashboard () {
       period
     })
   }
+  const exportChartToImage = async (chartConfig, filename = 'chart') => {
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+
+  const exportChart = Highcharts.chart(container, {
+    ...chartConfig,
+    chart: {
+      ...chartConfig.chart,
+      backgroundColor: '#2a2a2e' // match your theme
+    }
+  })
+
+  exportChart.exportChart({
+    type: 'image/png',
+    filename
+  })
+
+  setTimeout(() => {
+    exportChart.destroy()
+    document.body.removeChild(container)
+  }, 500)
+}
+
 
   // Chart configs with refs
   const agg = useMemo(() => {
@@ -510,10 +533,15 @@ export default function ReportDashboard () {
     return { platforms, getSum }
   }, [metrics])
 
-  const totalViews = ['google', 'facebook', 'instagram', 'tiktok', 'x'].reduce(
-    (sum, pf) => sum + agg.getSum(pf, 'views'),
-    0
-  )
+ const totalViews = ['google', 'facebook', 'instagram', 'tiktok', 'x'].reduce(
+  (sum, pf) =>
+    sum +
+    (pf === 'tiktok'
+      ? agg.getSum(pf, 'post views') // FIX: TikTok uses 'post views'
+      : agg.getSum(pf, 'views')),
+  0
+)
+
   const totalLikes = ['facebook', 'instagram', 'tiktok', 'x'].reduce(
     (sum, pf) => sum + agg.getSum(pf, 'likes'),
     0
@@ -846,16 +874,25 @@ export default function ReportDashboard () {
                   {chartConfigs[0]?.title?.text || `Chart 1`}
                 </Text>
               }
-              extra={
-                <Button
-                  size='small'
-                  onClick={() =>
-                    setExpandedChart(JSON.parse(JSON.stringify(config)))
-                  }
-                >
-                  Expand <MotionIcon style={{ marginLeft: 4 }} />
-                </Button>
-              }
+            extra={
+  <Flex gap={3}>
+    <Button onClick={() => setExpandedChart(chartConfig)} type='link'>
+      Expand
+    </Button>
+    <Button
+      type='link'
+      onClick={() =>
+        exportChartToImage(
+          chartConfig,
+          `${group.title.replace(/\s+/g, '_')}_${selectedPlatform}`
+        )
+      }
+    >
+      Download
+    </Button>
+  </Flex>
+}
+
               hoverable
             >
               <HighchartsReact
