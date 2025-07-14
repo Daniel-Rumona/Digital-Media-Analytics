@@ -50,6 +50,24 @@ const PLATFORM_CHART_GROUPS = {
       colors: ['#FAAD14']
     }
   ],
+  linkedin: [
+  {
+    title: 'Impressions & Page Views',
+    metrics: ['impressions', 'page views'],
+    colors: ['#0077B5', '#00A0DC']
+  },
+  {
+    title: 'Reactions & Comments',
+    metrics: ['reactions', 'comments'],
+    colors: ['#FFC107', '#FF5722']
+  },
+  {
+    title: 'New Follows & Searches',
+    metrics: ['new follows', 'searches'],
+    colors: ['#4CAF50', '#9C27B0']
+  }
+]
+,
   facebook: [
     {
       title: 'Views & Interactions',
