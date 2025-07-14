@@ -542,9 +542,12 @@ const connectedPlatforms = useMemo(() => {
 const totalViews = connectedPlatforms.reduce(
   (sum, pf) =>
     sum +
-    (pf === 'tiktok'
-      ? agg.getSum(pf, 'post views')
-      : agg.getSum(pf, 'views')),
+   (pf === 'tiktok'
+  ? agg.getSum(pf, 'post views')
+  : pf === 'linkedin'
+  ? agg.getSum(pf, 'page views')
+  : agg.getSum(pf, 'views'))
+,
   0
 )
 
@@ -599,7 +602,9 @@ const chartConfigs: HighchartsOptions[] = [
         data: connectedPlatforms.map(pf =>
         pf === 'tiktok'
           ? agg.getSum(pf, 'post views')
-          : agg.getSum(pf, 'views')
+  : pf === 'linkedin'
+  ? agg.getSum(pf, 'page views')
+  : agg.getSum(pf, 'views')
       ),
         yAxis: 1,
         color: '#4299E1'
@@ -809,12 +814,7 @@ const chartConfigs: HighchartsOptions[] = [
     series: [
       {
         name: 'New Followers',
-        data: [
-          agg.getSum('facebook', 'new follows'),
-          agg.getSum('instagram', 'new follows'),
-          agg.getSum('tiktok', 'new follows'),
-          agg.getSum('x', 'new follows')
-        ],
+        data: connectedPlatforms.map(pf => agg.getSum(pf, 'new follows')),
         pointPlacement: 'on',
         color: '#48BB78'
       }
