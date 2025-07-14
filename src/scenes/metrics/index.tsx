@@ -60,6 +60,14 @@ const PLATFORM_METRICS = {
     'visits',
     'new follows'
   ],
+  linkedin: [
+    'impressions',
+    'reactions',
+    'comments',
+    'page views',
+    'new follows',
+    'searches'
+  ],
   tiktok: [
     'posts',
     'new follows',
