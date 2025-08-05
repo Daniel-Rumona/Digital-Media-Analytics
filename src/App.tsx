@@ -10,12 +10,14 @@ import SentimentAnalysis from './scenes/sentiment-analysis'
 import CompaniesTable from './scenes/companies'
 import CompanyMetricsManager from './scenes/metrics'
 import PostAnalysis from './scenes/post-analysis'
+import MetaAuthCallback from './scenes/MetaCallback'
 
 function App () {
   return (
     <Router>
       <Routes>
         <Route path='/' element={<LandingPage />} />
+        <Route path='/meta-auth-callback' element={<MetaAuthCallback />} />
         <Route path='/register' element={<RegistrationPage />} />
         <Route path='/login' element={<LoginPage />} />
         <Route
