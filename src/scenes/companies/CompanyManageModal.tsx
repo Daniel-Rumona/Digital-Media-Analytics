@@ -29,20 +29,48 @@ const SOCIAL_PLATFORMS = [
   { label: 'YouTube', value: 'youtube', placeholder: 'Channel/Brand' }
 ]
 
-// Stub for OAuth, replace with real logic
-const handleConnectStub = async (platform, idx, setOauthStatus) => {
-  message.loading({ content: `Connecting to ${platform}...`, key: platform })
-  setTimeout(() => {
-    setOauthStatus(status => ({
-      ...status,
-      [idx]: { connected: true, platform, token: 'fakeToken' }
-    }))
-    message.success({
-      content: `${platform} connected!`,
-      key: platform,
-      duration: 2
-    })
-  }, 1200)
+// Stub for OAuth
+const handleConnect = async (platform, idx, setOauthStatus) => {
+  if (platform !== 'facebook') {
+    message.info(`OAuth for ${platform} not yet implemented.`)
+    return
+  }
+
+  const popup = window.open(
+    `https://www.facebook.com/v19.0/dialog/oauth?client_id=2009299733210733&redirect_uri=https://digital-media-analytics.vercel.app/meta-auth-callback&scope=pages_show_list,instagram_basic,pages_read_engagement`,
+    '_blank',
+    'width=600,height=700'
+  )
+
+  const interval = setInterval(() => {
+    try {
+      if (!popup || popup.closed) {
+        clearInterval(interval)
+        return
+      }
+
+      const stored = localStorage.getItem('page_access_token')
+      const pageId = localStorage.getItem('page_id')
+
+      if (stored && pageId) {
+        clearInterval(interval)
+
+        setOauthStatus(status => ({
+          ...status,
+          [idx]: {
+            connected: true,
+            platform,
+            token: stored,
+            pageId
+          }
+        }))
+
+        message.success('Facebook page connected!')
+      }
+    } catch (err) {
+      console.error('[OAuth Polling Error]', err)
+    }
+  }, 1000)
 }
 
 const AccountRow = ({
@@ -113,7 +141,7 @@ const AccountRow = ({
               <LinkOutlined />
             )
           }
-          onClick={() => handleConnectStub(platform, idx, setOauthStatus)}
+          onClick={() => handleConnect(platform, idx, setOauthStatus)}
           disabled={!platform || loading}
           style={{
             background: oauthStatus[idx]?.connected ? '#52c41a' : undefined,
@@ -196,7 +224,12 @@ const CompanyManageModal = ({
             handle: acc.handle,
             connected: !!oauthStatus[idx]?.connected,
             ...(oauthStatus[idx]?.token
-              ? { oauth: { accessToken: oauthStatus[idx].token } }
+              ? {
+                  oauth: {
+                    accessToken: oauthStatus[idx].token,
+                    pageId: oauthStatus[idx].pageId
+                  }
+                }
               : {})
           }
           return cleanObject(obj)
