@@ -1,292 +1,328 @@
 import { useState } from 'react'
 import {
-  Box,
-  Flex,
-  Heading,
-  VStack,
+  Row,
+  Col,
+  Card,
+  Form,
   Input,
-  Link,
-  IconButton,
   Button,
-  Image,
-  Text,
-  Highlight,
-  Stack,
-  HStack,
-  ButtonGroup
-} from '@chakra-ui/react'
-import { useColorModeValue } from '@/components/ui/color-mode'
-import { FiEye, FiEyeOff, FiLock, FiArrowLeft } from 'react-icons/fi'
+  Divider,
+  Typography,
+  message,
+  Spin
+} from 'antd'
+import {
+  UserOutlined,
+  LockOutlined,
+  EyeInvisibleOutlined,
+  EyeTwoTone,
+  ArrowLeftOutlined,
+  GoogleOutlined
+} from '@ant-design/icons'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup
 } from 'firebase/auth'
-import type { User } from 'firebase/auth'
 import { auth, db } from '@/firebase/firebase'
-import type { DocumentData } from 'firebase/firestore'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
-import { message, Spin } from 'antd'
 
-const MotionBox = motion(Box)
+const { Title, Text } = Typography
+const { Password } = Input
 
-export const BackButton = () => (
-  <Button
-    as={RouterLink}
-    to='/'
-    size='xs'
-    colorPalette='teal'
-    variant='ghost'
-    rounded='full'
-    _hover={{ transform: 'translateY(-1px)', boxShadow: 'lg' }}
-    _active={{ transform: 'translateY(0)' }}
-  >
-    <FiArrowLeft />
-  </Button>
-)
-
-interface FieldProps {
-  label: string
-  children: React.ReactNode
-}
-const Field = ({ label, children }: FieldProps) => {
-  const textColor = useColorModeValue('gray.100', 'gray.100')
-  return (
-    <Box>
-      <Text mb={1} fontWeight='bold' color={textColor}>
-        {label}
-      </Text>
-      {children}
-    </Box>
-  )
-}
-
-interface PasswordFieldProps {
-  label: string
-  placeholder: string
-  value: string
-  onChange: (v: string) => void
-  isDisabled?: boolean
-}
-const PasswordField = ({
-  label,
-  placeholder,
-  value,
-  onChange,
-  isDisabled = false
-}: PasswordFieldProps) => {
-  const [show, setShow] = useState(false)
-  const textColor = useColorModeValue('gray.100', 'gray.100')
-
-  return (
-    <Field label={label}>
-      <HStack spacing={0} bg='gray.700' borderRadius='md'>
-        <Input
-          flex='1'
-          type={show ? 'text' : 'password'}
-          placeholder={placeholder}
-          bg='transparent'
-          border={0}
-          color={textColor}
-          _focus={{ outline: 'none' }}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          isDisabled={isDisabled}
-        />
-        <IconButton
-          aria-label='Toggle visibility'
-          bg='transparent'
-          colorScheme='teal'
-          _hover={{ bg: 'transparent' }}
-          onClick={() => setShow(!show)}
-          isDisabled={isDisabled}
-          icon={show ? <FiEyeOff /> : <FiEye />}
-        />
-      </HStack>
-      <Text
-        mt={1}
-        fontSize='sm'
-        color='gray.400'
-        display='flex'
-        alignItems='center'
-      >
-        <FiLock style={{ marginRight: '6px' }} /> Your credentials are
-        encrypted.
-      </Text>
-    </Field>
-  )
-}
+// Motion components
+const MotionDiv = motion.div
 
 const LoginPage = () => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
-
   const navigate = useNavigate()
 
-  // Fetch user profile, create if missing
-  const fetchOrCreateUserProfile = async (
-    uid: string,
-    authUser: User
-  ): Promise<DocumentData> => {
-    const userRef = doc(db, 'users', uid)
-    const userSnap = await getDoc(userRef)
-    if (userSnap.exists()) {
-      return userSnap.data()
-    } else {
-      // Auto-create minimal profile from Auth
-      const newProfile = {
-        fullName: authUser.displayName ?? '',
-        email: authUser.email,
-        createdAt: serverTimestamp()
-      }
-      await setDoc(userRef, newProfile)
-      return newProfile
-    }
-  }
-
-  const handleLogin = async (): Promise<void> => {
+  const onFinish = async values => {
     setLoading(true)
     try {
-      const res = await signInWithEmailAndPassword(auth, email, password)
-      await fetchOrCreateUserProfile(res.user.uid, res.user)
+      const res = await signInWithEmailAndPassword(
+        auth,
+        values.email,
+        values.password
+      )
+      await setDoc(doc(db, 'users', res.user.uid), {
+        fullName: res.user.displayName ?? '',
+        email: res.user.email,
+        createdAt: serverTimestamp()
+      })
       message.success('Login successful!')
       navigate('/dashboard')
-    } catch (err: any) {
+    } catch (err) {
       message.error(err.message)
-      console.log(err)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
-  const handleGoogleLogin = async (): Promise<void> => {
+  const handleGoogleLogin = async () => {
     setLoading(true)
     try {
       const provider = new GoogleAuthProvider()
       const res = await signInWithPopup(auth, provider)
-      await fetchOrCreateUserProfile(res.user.uid, res.user)
-      message.success('Signed in with Google!')
+      await setDoc(doc(db, 'users', res.user.uid), {
+        fullName: res.user.displayName ?? '',
+        email: res.user.email,
+        createdAt: serverTimestamp()
+      })
+      message.success('Google login successful!')
       navigate('/dashboard')
-    } catch (err: any) {
+    } catch (err) {
       message.error(err.message)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
-  const bg = useColorModeValue('gray.900', 'gray.900')
-  const cardBg = useColorModeValue('gray.800', 'gray.800')
-  const textColor = useColorModeValue('gray.100', 'gray.100')
-
   return (
-    <Flex
-      minH='100vh'
-      bg={bg}
-      align='center'
-      justify='center'
-      position='relative'
-      px={4}
-    >
-      {/* Spinner Overlay */}
+    <Row style={{ minHeight: '100vh' }}>
+      {/* Left Pane - Form */}
+      <Col
+        xs={24}
+        md={12}
+        style={{ padding: '2rem', display: 'flex', alignItems: 'center' }}
+      >
+        <MotionDiv
+          style={{ maxWidth: '450px', margin: '0 auto', width: '100%' }}
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Button
+            type='text'
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate('/')}
+            style={{ marginBottom: '1rem' }}
+          >
+            Back
+          </Button>
+
+          <Title level={3} style={{ marginBottom: '1rem' }}>
+            Login to your account
+          </Title>
+
+          <Card>
+            <Form form={form} layout='vertical' onFinish={onFinish}>
+              <Form.Item
+                name='email'
+                label='Email'
+                rules={[
+                  { required: true, message: 'Please input your email!' },
+                  { type: 'email', message: 'Please enter a valid email!' }
+                ]}
+              >
+                <Input
+                  prefix={<UserOutlined />}
+                  placeholder='user@example.com'
+                  size='large'
+                />
+              </Form.Item>
+
+              <Form.Item
+                name='password'
+                label='Password'
+                rules={[
+                  { required: true, message: 'Please input your password!' }
+                ]}
+              >
+                <Password
+                  prefix={<LockOutlined />}
+                  placeholder='••••••••'
+                  size='large'
+                  iconRender={visible =>
+                    visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />
+                  }
+                />
+              </Form.Item>
+
+              <Form.Item>
+                <Button
+                  type='primary'
+                  htmlType='submit'
+                  block
+                  size='large'
+                  loading={loading}
+                >
+                  Login
+                </Button>
+              </Form.Item>
+
+              <Divider>or</Divider>
+
+              <Button
+                icon={<GoogleOutlined />}
+                block
+                size='large'
+                onClick={handleGoogleLogin}
+                loading={loading}
+              >
+                Continue with Google
+              </Button>
+
+              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                <Text>
+                  Don't have an account? <Link to='/register'>Sign up</Link>
+                </Text>
+              </div>
+            </Form>
+          </Card>
+        </MotionDiv>
+      </Col>
+
+      {/* Right Pane - Floating Blobs with Centered Message */}
+      <Col xs={0} md={12} style={{ position: 'relative', overflow: 'hidden' }}>
+        {/* Main Blob (Large, Centered) */}
+        <MotionDiv
+          style={{
+            position: 'absolute',
+            top: '40%',
+            left: '50%',
+            width: '400px',
+            height: '400px',
+            borderRadius: '76% 24% 85% 15% / 30% 72% 28% 70%',
+            background:
+              'linear-gradient(45deg, rgba(24, 144, 255, 0.7), rgba(114, 46, 209, 0.7))',
+            filter: 'blur(60px)',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 1
+          }}
+          animate={{
+            borderRadius: [
+              '76% 24% 85% 15% / 30% 72% 28% 70%',
+              '53% 47% 34% 66% / 63% 38% 62% 37%',
+              '76% 24% 85% 15% / 30% 72% 28% 70%'
+            ],
+            scale: [1, 1.1, 1],
+            rotate: [0, 10, 0]
+          }}
+          transition={{
+            duration: 12,
+            repeat: Infinity,
+            repeatType: 'reverse',
+            ease: 'easeInOut'
+          }}
+        />
+
+        {/* Secondary Blob (Top Right) */}
+        <MotionDiv
+          style={{
+            position: 'absolute',
+            top: '25%',
+            right: '15%',
+            width: '200px',
+            height: '200px',
+            borderRadius: '63% 37% 56% 44% / 25% 66% 34% 75%',
+            background:
+              'linear-gradient(45deg, rgba(19, 194, 194, 0.6), rgba(82, 196, 26, 0.6))',
+            filter: 'blur(40px)',
+            zIndex: 2
+          }}
+          animate={{
+            borderRadius: [
+              '63% 37% 56% 44% / 25% 66% 34% 75%',
+              '37% 63% 44% 56% / 66% 25% 75% 34%',
+              '63% 37% 56% 44% / 25% 66% 34% 75%'
+            ],
+            y: ['0px', '-30px', '0px'],
+            x: ['0px', '20px', '0px']
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            repeatType: 'reverse',
+            ease: 'easeInOut',
+            delay: 1
+          }}
+        />
+
+        {/* Tertiary Blob (Bottom Left) */}
+        <MotionDiv
+          style={{
+            position: 'absolute',
+            bottom: '20%',
+            left: '15%',
+            width: '150px',
+            height: '150px',
+            borderRadius: '37% 63% 70% 30% / 47% 30% 70% 53%',
+            background:
+              'linear-gradient(45deg, rgba(250, 140, 22, 0.5), rgba(245, 34, 45, 0.5))',
+            filter: 'blur(30px)',
+            zIndex: 3
+          }}
+          animate={{
+            borderRadius: [
+              '37% 63% 70% 30% / 47% 30% 70% 53%',
+              '63% 37% 30% 70% / 30% 47% 53% 70%',
+              '37% 63% 70% 30% / 47% 30% 70% 53%'
+            ],
+            y: ['0px', '20px', '0px'],
+            x: ['0px', '-20px', '0px']
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            repeatType: 'reverse',
+            ease: 'easeInOut',
+            delay: 2
+          }}
+        />
+
+        {/* Centered White Message */}
+        <MotionDiv
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.5 }}
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            textAlign: 'center',
+            width: '100%',
+            maxWidth: '500px',
+            padding: '1rem',
+            zIndex: 4,
+            color: 'white',
+            textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+          }}
+        >
+          <Title level={2} style={{ color: 'white', marginBottom: '1rem' }}>
+            Welcome back!
+          </Title>
+          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: '1.1rem' }}>
+            Login to access your dashboard and continue tracking your social
+            media performance.
+          </Text>
+        </MotionDiv>
+      </Col>
+
+      {/* Loading overlay */}
       {loading && (
-        <Box
-          position='fixed'
-          zIndex={9999}
-          inset={0}
-          display='flex'
-          alignItems='center'
-          justifyContent='center'
-          bg='rgba(30,30,30,0.45)'
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+          }}
         >
           <Spin size='large' tip='Logging in...' />
-        </Box>
+        </div>
       )}
-
-      <MotionBox
-        w={{ base: 'full', md: '480px' }}
-        bg={cardBg}
-        p={8}
-        borderRadius='lg'
-        boxShadow='lg'
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-      >
-        <HStack>
-          <BackButton />
-          <Stack>
-            <Heading size='xl' letterSpacing='tight'>
-              <Highlight query='with speed' styles={{ color: 'teal.600' }}>
-                Track social media presence with speed
-              </Highlight>
-            </Heading>
-            <Text
-              fontSize='md'
-              color='fg.muted'
-              style={{ textAlign: 'center' }}
-            >
-              Login to your account
-            </Text>
-          </Stack>
-        </HStack>
-
-        <VStack spacing={4} align='stretch' style={{ marginTop: 20 }}>
-          <Field label='Email Address'>
-            <Input
-              placeholder='user@example.com'
-              bg='gray.700'
-              border={0}
-              color={textColor}
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              isDisabled={loading}
-            />
-          </Field>
-          <PasswordField
-            label='Password'
-            placeholder='••••••••'
-            value={password}
-            onChange={setPassword}
-            isDisabled={loading}
-          />
-
-          <ButtonGroup width='100%' size='sm' variant='outline' spacing={2}>
-            <Button
-              size='lg'
-              variant='surface'
-              colorPalette={'cyan'}
-              rounded='full'
-              mt={2}
-              _hover={{ transform: 'translateY(-2px)' }}
-              onClick={handleLogin}
-              loading={loading}
-              disabled={!email || !password || loading}
-            >
-              Login
-            </Button>
-            <Button
-              size='lg'
-              variant='solid'
-              colorScheme='red'
-              rounded='full'
-              mt={2}
-              onClick={handleGoogleLogin}
-              isLoading={loading}
-              isDisabled={loading}
-            >
-              Sign in with Google
-            </Button>
-          </ButtonGroup>
-          <Text style={{ marginTop: 5, textAlign: 'center' }}>
-            Don&apos;t have an account?{' '}
-            <Link as={RouterLink} to='/register' color='teal.400'>
-              Register
-            </Link>
-          </Text>
-        </VStack>
-      </MotionBox>
-    </Flex>
+    </Row>
   )
 }
 

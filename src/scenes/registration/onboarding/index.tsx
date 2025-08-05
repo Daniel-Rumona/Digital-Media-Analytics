@@ -10,6 +10,7 @@ const SOCIAL_PLATFORMS = [
   'Instagram',
   'X',
   'Tiktok',
+  'LinkedIn',
   'Google',
   'YouTube'
 ]
