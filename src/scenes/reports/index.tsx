@@ -12,6 +12,14 @@ import {
   Spin,
   Alert
 } from 'antd'
+import {
+  FiBarChart2,
+  FiThumbsUp,
+  FiEdit,
+  FiDownload,
+  FiLink,
+  FiMaximize2
+} from 'react-icons/fi'
 import Highcharts from 'highcharts'
 import type { Options as HighchartsOptions } from 'highcharts'
 import HighchartsReact from 'highcharts-react-official'
@@ -34,18 +42,17 @@ import {
   Media,
   ImageRun
 } from 'docx'
-import {
-  FiBarChart2,
-  FiThumbsUp,
-  FiEdit,
-  FiDownload,
-  FiLink,
-  FiMaximize2
-} from 'react-icons/fi'
 import { saveAs } from 'file-saver'
 import dayjs, { Dayjs } from 'dayjs'
 import HighchartsExporting from 'highcharts/modules/exporting'
 import HighchartsOfflineExporting from 'highcharts/modules/offline-exporting'
+// Add to your imports
+import { PDFDocument, rgb, degrees } from 'pdf-lib'
+import fontkit from '@pdf-lib/fontkit'
+import { generateSimplePdfWithWatermark } from './generateSimplePdf'
+import { exportPlatformChartsAsImages } from '@/utils/chartImageExport'
+import type { MetricDoc } from '@/scenes/reports/types'
+import { FileWordFilled } from '@ant-design/icons'
 
 const { RangePicker, MonthPicker } = DatePicker
 const { Text, Title, Paragraph: AntParagraph } = Typography
@@ -63,19 +70,25 @@ type MetricsRecord = {
   metrics: Record<string, number | string | undefined>
 }
 
-type PlatformInsight = {
-  name: string
-  metrics: { label: string; value: string | number }[]
-  observations: string[]
-}
+// Use the same tone as your cards
+const DARK_BG = '#23242A' // (Platforms page uses ~'#2a2a2e')
 
+// Update your ModalReport type to match the Hurlingham House structure:
 type ModalReport = {
   companyName: string
   period: string
   overview: string
   consolidatedChartObservations: string[]
-  platforms: PlatformInsight[]
-  googleFunnelObservations: string[]
+  platforms: {
+    name: string
+    metrics: {
+      label: string
+      value: string | number
+      industryAverage?: string | number
+    }[]
+    observations: string[]
+  }[]
+  googleFunnelObservations?: string[]
   swot: {
     strengths: string[]
     weaknesses: string[]
@@ -91,15 +104,220 @@ type ModalReport = {
   }
   conclusion: string
   preparedBy: string
+  // Add Hurlingham-specific fields
+  address?: string
+  regNumber?: string
+  targetAudience?: string[]
+  marketingChannels?: string[]
+  promotions?: string[]
+  analytics?: string[]
 }
 
 Highcharts.setOptions({
   exporting: { enabled: false }
 })
 
+const PLATFORM_CHART_GROUPS: Record<
+  string,
+  { title: string; metrics: string[]; colors?: string[] }[]
+> = {
+  google: [
+    {
+      title: 'Website & Booking Clicks',
+      metrics: ['website clicks', 'booking clicks']
+    },
+    { title: 'Reviews & Calls', metrics: ['reviews', 'calls'] },
+    { title: 'Views & Search Hits', metrics: ['views', 'search hits'] },
+    {
+      title: 'Directions & Chat Clicks',
+      metrics: ['directions', 'chat clicks']
+    },
+    { title: 'Rating', metrics: ['rating'] }
+  ],
+  facebook: [
+    {
+      title: 'Views & Interactions',
+      metrics: ['views', 'content interactions']
+    },
+    { title: 'Posts & Reach', metrics: ['posts', 'reach'] },
+    {
+      title: 'Content & Link Clicks',
+      metrics: ['content interactions', 'link clicks']
+    },
+    { title: 'Visits & New Follows', metrics: ['visits', 'new follows'] }
+  ],
+  instagram: [
+    {
+      title: 'Views & Interactions',
+      metrics: ['views', 'content interactions']
+    },
+    { title: 'Posts & Reach', metrics: ['posts', 'reach'] },
+    {
+      title: 'Content & Link Clicks',
+      metrics: ['content interactions', 'link clicks']
+    },
+    { title: 'Visits & New Follows', metrics: ['visits', 'new follows'] }
+  ],
+  tiktok: [
+    {
+      title: 'Posts, New Follows & Post Views',
+      metrics: ['posts', 'new follows', 'post views']
+    },
+    {
+      title: 'Profile Views, Likes & Comments',
+      metrics: ['profile views', 'likes', 'comments']
+    },
+    { title: 'Shares', metrics: ['shares'] }
+  ],
+  x: [
+    {
+      title: 'New Follows, Posts & Views',
+      metrics: ['new follows', 'posts', 'views']
+    },
+    { title: 'Likes & Shares', metrics: ['likes', 'shares'] }
+  ]
+}
+
 // Chart refs
-const consolidatedChartRef = createRef<HighchartsReact.RefObject>()
-const funnelChartRef = createRef<HighchartsReact.RefObject>()
+const consolidatedChartRef = createRef<any>()
+const funnelChartRef = createRef<any>()
+
+// A4 portrait points: 595 x 842
+type GridOpts = {
+  margin?: number // page margin
+  cols?: number // columns per page
+  rowGap?: number // gap between rows
+  colGap?: number // gap between cols
+  captionSize?: number // caption font size
+  captionGap?: number // gap between image and caption
+  pageSize?: [number, number] // width,height
+  font?: any // pdf-lib font, pass your 'font'
+}
+
+// For PDF
+// constants: A4 portrait
+const A4: [number, number] = [595, 842]
+const HEX = (h: string) => ({
+  r: parseInt(h.slice(1, 3), 16) / 255,
+  g: parseInt(h.slice(3, 5), 16) / 255,
+  b: parseInt(h.slice(5, 7), 16) / 255
+})
+
+async function drawChartGrid2x2 (
+  pdfDoc: PDFDocument,
+  addPageWithWatermark: (doc: PDFDocument) => Promise<any>,
+  images: Array<{ title: string; dataUrl: string }>,
+  opts: {
+    margin?: number
+    colGap?: number
+    rowGap?: number
+    captionSize?: number
+    captionGap?: number
+    font?: any
+    pageSize?: [number, number]
+    cellBg?: string // optional
+    debugCells?: boolean // optional, draws cell frames
+  } = {}
+) {
+  const {
+    margin = 40,
+    colGap = 12,
+    rowGap = 12,
+    captionSize = 10,
+    captionGap = 4,
+    font,
+    pageSize = [595, 842],
+    cellBg,
+    debugCells = false
+  } = opts
+
+  const [PW, PH] = pageSize
+  const usableW = PW - margin * 2
+  const usableH = PH - margin * 2
+
+  const cols = 2,
+    rows = 2,
+    perPage = cols * rows
+  const colW = (usableW - colGap) / cols // 2 cols -> 1 gap
+  const cellH = (usableH - rowGap) / rows // 2 rows -> 1 gap
+  const captionH = captionSize + captionGap
+  const imgAreaH = cellH - captionH // area reserved for image
+
+  // pre-embed
+  const embedded = await Promise.all(
+    images.map(async it => ({
+      title: it.title,
+      img: await pdfDoc.embedPng(
+        Uint8Array.from(atob(it.dataUrl.split(',')[1]), c => c.charCodeAt(0))
+      )
+    }))
+  )
+
+  for (let i = 0; i < embedded.length; i += perPage) {
+    const page = await addPageWithWatermark(pdfDoc)
+    const batch = embedded.slice(i, i + perPage)
+
+    for (let idx = 0; idx < batch.length; idx++) {
+      const r = Math.floor(idx / cols)
+      const c = idx % cols
+
+      const x = margin + c * (colW + colGap)
+      const yTop = PH - margin - r * (cellH + rowGap) // top of this cell
+
+      const { img, title } = batch[idx]
+
+      // scale to fit INSIDE (colW x imgAreaH)
+      const scale = Math.min(colW / img.width, imgAreaH / img.height)
+      const w = img.width * scale
+      const h = img.height * scale
+
+      // image area: top = yTop - captionH, bottom = yTop - cellH
+      const imgAreaTop = yTop - captionH
+      const imgAreaBottom = yTop - cellH
+
+      // center vertically within the image area
+      const yImg = imgAreaBottom + (imgAreaH - h) / 2
+      const xImg = x + (colW - w) / 2
+
+      // OPTIONAL: cell background or debug frame
+      if (cellBg) {
+        const rHex = parseInt(cellBg.slice(1, 3), 16) / 255
+        const gHex = parseInt(cellBg.slice(3, 5), 16) / 255
+        const bHex = parseInt(cellBg.slice(5, 7), 16) / 255
+        page.drawRectangle({
+          x,
+          y: yTop - cellH,
+          width: colW,
+          height: cellH,
+          color: rgb(rHex, gHex, bHex)
+        })
+      }
+      if (debugCells) {
+        page.drawRectangle({
+          x,
+          y: yTop - cellH,
+          width: colW,
+          height: cellH,
+          borderColor: rgb(1, 1, 1),
+          borderWidth: 0.5
+        })
+      }
+
+      // image + caption
+      page.drawImage(img, { x: xImg, y: yImg, width: w, height: h })
+      if (font) {
+        page.drawText(title, {
+          x,
+          y: imgAreaTop - captionSize, // near top of cell’s caption band
+          size: captionSize,
+          font,
+          color: rgb(1, 1, 1),
+          maxWidth: colW
+        })
+      }
+    }
+  }
+}
 
 function base64ToArrayBuffer (dataUrl: string) {
   const base64 = dataUrl.split(',')[1]
@@ -110,23 +328,393 @@ function base64ToArrayBuffer (dataUrl: string) {
   return bytes.buffer
 }
 
+function historyToMetricDocs (
+  pfKey: string,
+  platformMetricsHistory: Record<string, any[]>,
+  range: [Dayjs, Dayjs]
+): MetricDoc[] {
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[_\s]+/g, ' ')
+      .trim()
+
+  const hist = platformMetricsHistory[pfKey] || []
+  const start = range[0].format('YYYY-MM')
+  const end = range[1].format('YYYY-MM')
+
+  return hist
+    .filter((row: any) => {
+      const p = String(row.period || '')
+      return p >= start && p <= end
+    })
+    .map((row: any) => {
+      const metrics: Record<string, number> = {}
+      Object.entries(row).forEach(([k, v]) => {
+        if (k !== 'period' && typeof v === 'number') {
+          metrics[norm(k)] = Number(v) // <-- normalize keys here
+        }
+      })
+      return { platform: pfKey, period: String(row.period), metrics }
+    })
+}
+
+const dataUrlToBytes = (dataUrl: string) =>
+  Uint8Array.from(atob(dataUrl.split(',')[1]), c => c.charCodeAt(0))
+
+async function exportReportToPdf (
+  modalReport: ModalReport,
+  platformMetricsHistory: Record<string, any[]>,
+  consolidatedChartRef: React.RefObject<any>,
+  funnelChartRef: React.RefObject<any>,
+  dateRange: [Dayjs, Dayjs] // <-- add this
+) {
+  try {
+    // Create a new PDF document
+    const pdfDoc = await PDFDocument.create()
+    pdfDoc.registerFontkit(fontkit)
+
+    // Load fonts
+    const fontBytes = await fetch('/fonts/Roboto/Roboto-Regular.ttf').then(
+      res => res.arrayBuffer()
+    )
+    const font = await pdfDoc.embedFont(fontBytes)
+
+    // Helper function to add a page with watermark
+    const addPageWithWatermark = async (pdfDoc: PDFDocument) => {
+      const page = pdfDoc.addPage([595, 842]) // A4 size
+
+      // Add watermark (you can customize this)
+      page.drawText('STEIJ', {
+        x: 250,
+        y: 400,
+        size: 60,
+        color: rgb(0.9, 0.9, 0.9),
+        rotate: degrees(-45),
+        opacity: 0.1,
+        font
+      })
+
+      return page
+    }
+
+    // --- Cover Page ---
+    const coverPage = await addPageWithWatermark(pdfDoc)
+    coverPage.drawText('SOCIAL MEDIA MANAGEMENT', {
+      x: 50,
+      y: 700,
+      size: 24,
+      font
+    })
+    coverPage.drawText('MONTHLY REPORT', {
+      x: 50,
+      y: 660,
+      size: 24,
+      font
+    })
+    coverPage.drawText(`${modalReport.period}`, {
+      x: 50,
+      y: 620,
+      size: 24,
+      font
+    })
+    coverPage.drawText(
+      `Address: Unit 5, 30 Ann Road, Clayville East, Ollianisfonteln, 1666`,
+      {
+        x: 50,
+        y: 550,
+        size: 12,
+        font
+      }
+    )
+    coverPage.drawText(`Reg No.: 2025/14137507`, {
+      x: 50,
+      y: 530,
+      size: 12,
+      font
+    })
+
+    // --- Overview Page ---
+    const overviewPage = await addPageWithWatermark(pdfDoc)
+    overviewPage.drawText('Overview Across All Platforms', {
+      x: 50,
+      y: 750,
+      size: 18,
+      font
+    })
+
+    // Add overview text
+    const overviewLines = modalReport.overview.split('\n')
+    let yPosition = 700
+    overviewLines.forEach(line => {
+      overviewPage.drawText(line, {
+        x: 50,
+        y: yPosition,
+        size: 12,
+        font
+      })
+      yPosition -= 20
+    })
+
+    // Add platform metrics chart
+    const consolidatedDataUrl = await chartRefToPngDataUrl(consolidatedChartRef)
+    if (consolidatedDataUrl) {
+      const consolidatedImg = await pdfDoc.embedPng(
+        dataUrlToBytes(consolidatedDataUrl)
+      ) // ✅ bytes
+      overviewPage.drawImage(consolidatedImg, {
+        x: 50,
+        y: yPosition - 200,
+        width: 400,
+        height: 200
+      })
+    }
+
+    // --- Platform Pages ---
+    for (const platform of modalReport.platforms) {
+      let platformPage = await addPageWithWatermark(pdfDoc)
+
+      // Title
+      platformPage.drawText(platform.name, { x: 50, y: 780, size: 18, font })
+
+      // Metrics table
+      let cursorY = 750
+      platformPage.drawText('Metrics', { x: 50, y: cursorY, size: 12, font })
+      cursorY -= 16
+
+      platformPage.drawText('Metric', { x: 50, y: cursorY, size: 10, font })
+      platformPage.drawText('Value', { x: 220, y: cursorY, size: 10, font })
+      platformPage.drawText('Industry Avg.', {
+        x: 340,
+        y: cursorY,
+        size: 10,
+        font
+      })
+      cursorY -= 14
+
+      for (const m of platform.metrics) {
+        if (cursorY < 120) {
+          const next = await addPageWithWatermark(pdfDoc)
+          platformPage = next // <-- add this
+          cursorY = 780
+          platformPage.drawText(`${platform.name} (cont’d)`, {
+            x: 50,
+            y: cursorY,
+            size: 14,
+            font
+          })
+          cursorY -= 24
+        }
+        platformPage.drawText(String(m.label), {
+          x: 50,
+          y: cursorY,
+          size: 10,
+          font
+        })
+        platformPage.drawText(String(m.value), {
+          x: 220,
+          y: cursorY,
+          size: 10,
+          font
+        })
+        platformPage.drawText(String(m.industryAverage ?? 'N/A'), {
+          x: 340,
+          y: cursorY,
+          size: 10,
+          font
+        })
+        cursorY -= 12
+      }
+
+      // Observations
+      if (platform.observations?.length) {
+        cursorY -= 10
+        platformPage.drawText('Key Observations', {
+          x: 50,
+          y: cursorY,
+          size: 12,
+          font
+        })
+        cursorY -= 16
+        for (const obs of platform.observations) {
+          if (cursorY < 120) {
+            const next = await addPageWithWatermark(pdfDoc)
+            platformPage = next // <-- add this
+            cursorY = 780
+            platformPage.drawText(`${platform.name} (cont’d)`, {
+              x: 50,
+              y: cursorY,
+              size: 14,
+              font
+            })
+            cursorY -= 24
+          }
+          platformPage.drawText(`• ${obs}`, {
+            x: 50,
+            y: cursorY,
+            size: 10,
+            font
+          })
+          cursorY -= 12
+        }
+      }
+
+      // Build and embed platform charts (from history + dateRange)
+      const pfKey = platform.name.toLowerCase()
+      const platformDocs: MetricDoc[] = historyToMetricDocs(
+        pfKey,
+        platformMetricsHistory,
+        dateRange
+      )
+      const imgs = await exportPlatformChartsAsImages({
+        platform: pfKey,
+        range: dateRange,
+        chartGroups: PLATFORM_CHART_GROUPS[pfKey] || [],
+        metricDocs: platformDocs,
+        // was { width: 1200, height: 600 }  (landscape)
+        size: { width: 600, height: 900 } // portrait -> fills the cell height
+      })
+
+      if (imgs.length) {
+        cursorY -= 8
+        platformPage.drawText('Charts', { x: 50, y: cursorY, size: 12, font })
+        cursorY -= 6
+
+        await drawChartGrid2x2(pdfDoc, addPageWithWatermark, imgs, {
+          pageSize: [595, 842],
+          margin: 40,
+          colGap: 12,
+          rowGap: 12,
+          captionSize: 10,
+          captionGap: 4,
+          font,
+          cellBg: '#23242A'
+          // debugCells: true,   // <-- turn on once to verify the boxes
+        })
+
+        // after grid we don't rely on cursorY further for this page,
+        // since the grid manages its own rows/spills.
+      }
+    }
+
+    // --- SWOT Page ---
+    const swotPage = await addPageWithWatermark(pdfDoc)
+    swotPage.drawText('Environmental Assessment', {
+      x: 50,
+      y: 750,
+      size: 18,
+      font
+    })
+
+    let swotY = 700
+    for (const [category, items] of Object.entries(modalReport.swot)) {
+      swotPage.drawText(category.charAt(0).toUpperCase() + category.slice(1), {
+        x: 50,
+        y: swotY,
+        size: 14,
+        font
+      })
+      swotY -= 20
+
+      for (const item of items) {
+        swotPage.drawText(`• ${item}`, {
+          x: 50,
+          y: swotY,
+          size: 10,
+          font
+        })
+        swotY -= 15
+      }
+      swotY -= 10
+    }
+
+    // --- Action Plan Page ---
+    const actionPage = await addPageWithWatermark(pdfDoc)
+    actionPage.drawText('Action Plan', {
+      x: 50,
+      y: 750,
+      size: 18,
+      font
+    })
+
+    let actionY = 700
+    for (const [category, items] of Object.entries(
+      modalReport.recommendations
+    )) {
+      actionPage.drawText(
+        category.charAt(0).toUpperCase() + category.slice(1),
+        {
+          x: 50,
+          y: actionY,
+          size: 14,
+          font
+        }
+      )
+      actionY -= 20
+
+      for (const item of items) {
+        actionPage.drawText(`• ${item}`, {
+          x: 50,
+          y: actionY,
+          size: 10,
+          font
+        })
+        actionY -= 15
+      }
+      actionY -= 10
+    }
+
+    // --- Conclusion Page ---
+    const conclusionPage = await addPageWithWatermark(pdfDoc)
+    conclusionPage.drawText('Conclusion', {
+      x: 50,
+      y: 750,
+      size: 18,
+      font
+    })
+
+    conclusionPage.drawText(modalReport.conclusion, {
+      x: 50,
+      y: 700,
+      size: 12,
+      font,
+      maxWidth: 500,
+      lineHeight: 15
+    })
+
+    // Save the PDF
+    const pdfBytes = await pdfDoc.save()
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+    saveAs(blob, `${modalReport.companyName}_SocialMediaReport.pdf`)
+  } catch (err) {
+    console.error('PDF export failed:', err)
+    alert('Failed to export PDF. Check console for details.')
+  }
+}
+
 // --- THE KEY FIX: SVG to PNG as DataURL ---
-async function chartRefToPngDataUrl (chartRef) {
-  return new Promise<string>((resolve, reject) => {
+async function chartRefToPngDataUrl (chartRef): Promise<string> {
+  return new Promise((resolve, reject) => {
     if (
-      chartRef?.current &&
-      chartRef.current.chart &&
-      typeof chartRef.current.chart.getSVGForExport === 'function'
+      chartRef?.current?.chart &&
+      typeof chartRef.current.chart.getSVG === 'function'
     ) {
-      const svg = chartRef.current.chart.getSVGForExport()
-      const img = new window.Image()
+      const svg = chartRef.current.chart.getSVG()
+
       const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })
       const url = URL.createObjectURL(svgBlob)
+
+      const img = new Image()
       img.onload = () => {
         const canvas = document.createElement('canvas')
         canvas.width = img.width
         canvas.height = img.height
         const ctx = canvas.getContext('2d')
+
+        // 🔒 Always paint dark backdrop first
+        ctx.fillStyle = DARK_BG
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+
         ctx.drawImage(img, 0, 0)
         const dataUrl = canvas.toDataURL('image/png')
         URL.revokeObjectURL(url)
@@ -136,9 +724,10 @@ async function chartRefToPngDataUrl (chartRef) {
         URL.revokeObjectURL(url)
         reject(err)
       }
+      img.crossOrigin = 'anonymous'
       img.src = url
     } else {
-      reject(new Error('Chart not ready'))
+      reject(new Error('Chart not ready or missing getSVG'))
     }
   })
 }
@@ -152,36 +741,123 @@ async function exportReportToWord (
 ) {
   try {
     // Chart capture helpers
-    const svgToPngDataUrl = async chartRef => {
-      if (
-        chartRef?.current?.chart &&
-        typeof chartRef.current.chart.getSVGForExport === 'function'
-      ) {
-        const svg = chartRef.current.chart.getSVGForExport()
-        const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })
-        const url = URL.createObjectURL(svgBlob)
 
-        return new Promise((resolve, reject) => {
-          const img = new Image()
-          img.onload = () => {
-            const canvas = document.createElement('canvas')
-            canvas.width = img.width
-            canvas.height = img.height
-            const ctx = canvas.getContext('2d')
-            ctx.drawImage(img, 0, 0)
-            const dataUrl = canvas.toDataURL('image/png')
-            URL.revokeObjectURL(url)
-            resolve(dataUrl)
-          }
-          img.onerror = err => {
-            URL.revokeObjectURL(url)
-            reject('Image load failed')
-          }
-          img.src = url
+    // helper to get bytes from dataURL
+    const dataUrlToBytes = (u: string) =>
+      Uint8Array.from(atob(u.split(',')[1]), c => c.charCodeAt(0))
+
+    // Build platform-specific image grids
+    async function buildPlatformImageTables () {
+      const blocks: any[] = []
+
+      for (const platform of modalReport.platforms) {
+        const pfKey = platform.name.toLowerCase()
+        const docs: MetricDoc[] = historyToMetricDocs(
+          pfKey,
+          platformMetricsHistory,
+          [
+            dayjs(modalReport.period.split(' - ')[0] || dayjs()).startOf(
+              'month'
+            ),
+            dayjs(
+              modalReport.period.split(' - ')[1] || modalReport.period
+            ).endOf('month')
+          ] as any
+        ) // you already have dateRange elsewhere; feel free to pass it in
+
+        const imgs = await exportPlatformChartsAsImages({
+          platform: pfKey,
+          chartGroups: PLATFORM_CHART_GROUPS[pfKey] || [],
+          metricDocs: docs,
+          size: { width: 1200, height: 600 }
         })
-      } else {
-        throw new Error('Chart not ready or missing getSVGForExport()')
+
+        if (!imgs.length) continue
+
+        // 2×2 table of images with captions
+        const cellsPerRow = 2
+        const rows = Math.ceil(imgs.length / cellsPerRow)
+        const tableRows: TableRow[] = []
+
+        for (let r = 0; r < rows; r++) {
+          const rowCells: TableCell[] = []
+          for (let c = 0; c < cellsPerRow; c++) {
+            const idx = r * cellsPerRow + c
+            const item = imgs[idx]
+            if (!item) {
+              rowCells.push(new TableCell({ children: [new Paragraph('')] }))
+              continue
+            }
+            rowCells.push(
+              new TableCell({
+                children: [
+                  new Paragraph({
+                    children: [
+                      new ImageRun({
+                        data: dataUrlToBytes(item.dataUrl),
+                        // ~ half-page width; adjust to taste
+                        transformation: { width: 280, height: 140 }
+                      })
+                    ]
+                  }),
+                  new Paragraph({ text: item.title })
+                ]
+              })
+            )
+          }
+          tableRows.push(new TableRow({ children: rowCells }))
+        }
+
+        // Add a platform heading and the table
+        blocks.push(
+          new Paragraph({
+            text: `${platform.name} — Charts`,
+            heading: HeadingLevel.HEADING_3
+          }),
+          new Table({ rows: tableRows })
+        )
       }
+      return blocks
+    }
+
+    const svgToPngDataUrl = (chartRef: any): Promise<string> => {
+      if (!chartRef?.current?.chart) {
+        return Promise.reject(new Error('Chart not ready'))
+      }
+      const chart = chartRef.current.chart
+      const getSvg =
+        typeof chart.getSVGForExport === 'function'
+          ? chart.getSVGForExport.bind(chart)
+          : chart.getSVG.bind(chart)
+
+      const svg = getSvg()
+
+      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })
+      const url = URL.createObjectURL(svgBlob)
+
+      return new Promise((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          canvas.width = img.width
+          canvas.height = img.height
+          const ctx = canvas.getContext('2d')
+
+          // 🔒 Paint the same dark background
+          ctx.fillStyle = DARK_BG
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+          ctx.drawImage(img, 0, 0)
+          const dataUrl = canvas.toDataURL('image/png')
+          URL.revokeObjectURL(url)
+          resolve(dataUrl)
+        }
+        img.onerror = () => {
+          URL.revokeObjectURL(url)
+          reject(new Error('Image load failed'))
+        }
+        img.src = url
+      })
     }
 
     const consolidatedDataUrl = await svgToPngDataUrl(consolidatedChartRef)
@@ -191,12 +867,24 @@ async function exportReportToWord (
       alert('Could not capture one or more charts')
       return
     }
-
-    const consolidatedImg = base64ToArrayBuffer(consolidatedDataUrl)
     const funnelImg = base64ToArrayBuffer(funnelDataUrl)
+    const platformChartBlocks = await buildPlatformImageTables()
 
     const doc = new Document({ sections: [] })
     const children = [
+      // --- COVER PAGE ---
+      new Paragraph({
+        text: `${modalReport.companyName}`,
+        heading: HeadingLevel.HEADING_1
+      }),
+      new Paragraph({
+        text: 'SOCIAL MEDIA MANAGEMENT — MONTHLY REPORT',
+        heading: HeadingLevel.HEADING_2
+      }),
+      new Paragraph({ text: modalReport.period }),
+      new Paragraph({ text: ' ' }),
+      // add a soft divider
+      new Paragraph({ text: '—', heading: HeadingLevel.HEADING_6 }),
       new Paragraph({
         text: `${modalReport.companyName} — Social Media Report`,
         heading: HeadingLevel.HEADING_1
@@ -213,7 +901,7 @@ async function exportReportToWord (
       new Paragraph({
         children: [
           new ImageRun({
-            data: consolidatedImg,
+            data: dataUrlToBytes(consolidatedDataUrl), // instead of base64ToArrayBuffer(...)
             transformation: { width: 600, height: 300 }
           })
         ]
@@ -285,6 +973,8 @@ async function exportReportToWord (
           })
         ]
       }),
+      // --- Platform chart grids (2×2 per page width in Word) ---
+      ...platformChartBlocks,
       new Paragraph({ text: 'SWOT Analysis', heading: HeadingLevel.HEADING_2 }),
       ...['strengths', 'weaknesses', 'opportunities', 'threats'].flatMap(
         category => [
@@ -334,17 +1024,13 @@ export default function ReportDashboard () {
   const [expandedChart, setExpandedChart] = useState<HighchartsOptions | null>(
     null
   )
+  const [oldFollowersTotal, setOldFollowersTotal] = useState<number>(0)
+
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMonth, setModalMonth] = useState<Dayjs | null>(null)
   const reportRef = useRef<HTMLDivElement | null>(null)
   const { companyData, user } = useCompanyData()
   const [metrics, setMetrics] = useState<MetricsRecord[]>([])
-const connectedPlatforms = useMemo(() => {
-  if (!companyData?.accounts) return []
-  return companyData.accounts
-    .map(acc => acc.platform.toLowerCase())
-    .filter((v, i, a) => !!v && a.indexOf(v) === i)
-}, [companyData])
   const {
     insights: modalReport,
     loading: modalLoading,
@@ -364,6 +1050,33 @@ const connectedPlatforms = useMemo(() => {
       setChartsReady(true)
     }
   }, [consolidatedChartRef.current, funnelChartRef.current, isModalOpen])
+
+  useEffect(() => {
+    if (!user || !companyData?.id || !dateRange?.[1]) {
+      setOldFollowersTotal(0)
+      return
+    }
+
+    const end = dateRange[1].format('YYYY-MM')
+    const metricsRef = collection(
+      db,
+      'users',
+      user.uid,
+      'companies',
+      companyData.id,
+      'metrics'
+    )
+
+    getDocs(query(metricsRef, where('period', '<=', end))).then(snap => {
+      let total = 0
+      snap.forEach(d => {
+        const row = d.data() as MetricsRecord
+        const v = Number(row?.metrics?.['new follows'] || 0)
+        if (Number.isFinite(v)) total += v
+      })
+      setOldFollowersTotal(total)
+    })
+  }, [user, companyData, dateRange])
 
   // History for moving average computation
   const [platformMetricsHistory, setPlatformMetricsHistory] = useState<
@@ -502,29 +1215,25 @@ const connectedPlatforms = useMemo(() => {
       period
     })
   }
-  const exportChartToImage = async (chartConfig, filename = 'chart') => {
-  const container = document.createElement('div')
-  document.body.appendChild(container)
 
-  const exportChart = Highcharts.chart(container, {
-    ...chartConfig,
-    chart: {
-      ...chartConfig.chart,
-      backgroundColor: '#2a2a2e' // match your theme
+  // helpers for KPIs
+  const sumAny = (
+    getSum: (pf: string, k: string) => number,
+    pf: string,
+    keys: string[]
+  ) => keys.reduce((s, k) => s + getSum(pf, k), 0)
+
+  const firstNonZero = (
+    getSum: (pf: string, k: string) => number,
+    pf: string,
+    keys: string[]
+  ) => {
+    for (const k of keys) {
+      const v = getSum(pf, k)
+      if (v > 0) return v
     }
-  })
-
-  exportChart.exportChart({
-    type: 'image/png',
-    filename
-  })
-
-  setTimeout(() => {
-    exportChart.destroy()
-    document.body.removeChild(container)
-  }, 500)
-}
-
+    return 0
+  }
 
   // Chart configs with refs
   const agg = useMemo(() => {
@@ -539,27 +1248,67 @@ const connectedPlatforms = useMemo(() => {
     return { platforms, getSum }
   }, [metrics])
 
-const totalViews = connectedPlatforms.reduce(
-  (sum, pf) =>
-    sum +
-   (pf === 'tiktok'
-  ? agg.getSum(pf, 'post views')
-  : pf === 'linkedin'
-  ? agg.getSum(pf, 'page views')
-  : agg.getSum(pf, 'views'))
-,
-  0
-)
+  // Totals
+  const totalViews = ['google', 'facebook', 'instagram', 'tiktok', 'x'].reduce(
+    (sum, pf) => sum + agg.getSum(pf, pf === 'tiktok' ? 'post views' : 'views'),
+    0
+  )
 
-  const totalLikes = connectedPlatforms.reduce(
+  const totalLikes = ['facebook', 'instagram', 'tiktok', 'x'].reduce(
     (sum, pf) => sum + agg.getSum(pf, 'likes'),
     0
   )
+
+  // --- New KPI #1: Follower Growth (%)
+  // total new followers / total *old* followers × 100
+  // In-range new follows (across all platforms) — uses already-fetched `metrics` for the current range
+  const totalNewFollowersInRange = metrics.reduce(
+    (s, r) => s + Number(r.metrics?.['new follows'] || 0),
+    0
+  )
+
+  // Your requested definition:
+  // old followers = cumulative new follows from first record up to the *last month in range*
+  const followerGrowthPct =
+    oldFollowersTotal > 0
+      ? (totalNewFollowersInRange / oldFollowersTotal) * 100
+      : null
+
+  // Engagement Rate = A / B * 100
+  const sumKeys = (pf: string, keys: string[]) =>
+    keys.reduce((s, k) => s + agg.getSum(pf, k), 0)
+
+  const A =
+    // Google: Directions + Clicks + Calls
+    sumKeys('google', [
+      'directions',
+      'website clicks',
+      'booking clicks',
+      'chat clicks',
+      'calls'
+    ]) +
+    // Facebook: Clicks + Interaction + Visits
+    sumKeys('facebook', ['link clicks', 'content interactions', 'visits']) +
+    // Instagram: same as Facebook
+    sumKeys('instagram', ['link clicks', 'content interactions', 'visits']) +
+    // X: likes + shares + comments
+    sumKeys('x', ['likes', 'shares', 'comments']) +
+    // TikTok: profile views + comments + likes
+    sumKeys('tiktok', ['profile views', 'comments', 'likes'])
+
+  const B =
+    agg.getSum('google', 'views') +
+    agg.getSum('facebook', 'views') +
+    agg.getSum('instagram', 'views') +
+    agg.getSum('x', 'views') +
+    agg.getSum('tiktok', 'post views')
+
+  const engagementRatePct = B > 0 ? (A / B) * 100 : null
+
+  // Keep conversion rate available for reporting (not in the cards)
   const totalBookings = agg.getSum('google', 'booking clicks')
-  const conversionRate =
-    totalViews && totalBookings
-      ? `${((totalBookings / totalViews) * 100).toFixed(1)}%`
-      : '--'
+  const conversionRatePct =
+    totalViews > 0 ? (totalBookings / totalViews) * 100 : null
 
   const visualSummary = [
     {
@@ -575,252 +1324,271 @@ const totalViews = connectedPlatforms.reduce(
       icon: <FiThumbsUp size={28} color='#ED64A6' />
     },
     {
-      label: 'Conversion Rate',
-      value: conversionRate,
-      color: '#48BB78',
-      icon: <FiLink size={28} color='#48BB78' />
+      label: 'Follower Growth',
+      value:
+        followerGrowthPct != null ? `${followerGrowthPct.toFixed(1)}%` : '--',
+      color: '#38B2AC', // teal
+      icon: <FiMaximize2 size={28} color='#38B2AC' />
+    },
+    {
+      label: 'Engagement Rate',
+      value:
+        engagementRatePct != null ? `${engagementRatePct.toFixed(1)}%` : '--',
+      color: '#F6AD55', // orange
+      icon: <FiBarChart2 size={28} color='#F6AD55' />
     }
   ]
 
-const chartConfigs: HighchartsOptions[] = [
-  {
-    chart: { zoomType: 'xy' },
-    title: { text: 'Platform Metrics with View Trends', color: '#fff' },
-    xAxis: [{ 
-    categories: connectedPlatforms.map(pf => 
-      pf.charAt(0).toUpperCase() + pf.slice(1))
-  }],
-    yAxis: [
-      { title: { text: 'Counts' } },
-      { title: { text: 'Views' }, opposite: true }
-    ],
-    tooltip: { shared: true },
-    series: [
-      {
-        type: 'column',
-        name: 'Views',
-        data: connectedPlatforms.map(pf =>
-        pf === 'tiktok'
-          ? agg.getSum(pf, 'post views')
-  : pf === 'linkedin'
-  ? agg.getSum(pf, 'page views')
-  : agg.getSum(pf, 'views')
-      ),
-        yAxis: 1,
-        color: '#4299E1'
-      }
-    ]
-  },
-  {
-    chart: { type: 'funnel' },
-    title: { text: 'Conversion Funnel' },
-    plotOptions: {
-      series: {
-        dataLabels: {
-          enabled: true,
-          format: '<b>{point.name}</b>: {point.y}',
-          softConnector: true
-        },
-        center: ['50%', '50%'],
-        width: '80%'
-      }
-    },
-    series: [
-      {
-        name: 'Users',
-        data: [
-          ['Views', agg.getSum('google', 'views')],
-          ['Website Clicks', agg.getSum('google', 'website clicks')],
-          ['Calls', agg.getSum('google', 'calls')],
-          ['Bookings', agg.getSum('google', 'booking clicks')]
-        ]
-      }
-    ]
-  },
-  {
-    title: { text: 'Likes per Follower (All Platforms)' },
-    xAxis: {
-      categories: Array.from(new Set(metrics.map(row => row.period))).sort()
-    },
-    yAxis: {
-      title: { text: 'Ratio' },
-      labels: {
-        formatter () {
-          return this.value.toFixed(2)
+  const chartConfigs: HighchartsOptions[] = [
+    {
+      chart: { zoomType: 'xy', backgroundColor: DARK_BG },
+      title: { text: 'Platform Metrics with View Trends', color: '#fff' },
+      xAxis: [
+        { categories: ['Google', 'Facebook', 'Instagram', 'TikTok', 'X'] }
+      ],
+      yAxis: [
+        { title: { text: 'Counts' } },
+        { title: { text: 'Views' }, opposite: true }
+      ],
+      tooltip: { shared: true },
+      credits: { enabled: false },
+      series: [
+        {
+          type: 'column',
+          name: 'Views',
+          data: [
+            agg.getSum('google', 'views'),
+            agg.getSum('facebook', 'views'),
+            agg.getSum('instagram', 'views'),
+            agg.getSum('tiktok', 'views'),
+            agg.getSum('x', 'views')
+          ],
+          yAxis: 1,
+          color: '#4299E1'
         }
-      }
+      ]
     },
-    tooltip: {
-      pointFormat: '<b>{point.y:.2f}</b> Likes per Follower'
+    {
+      chart: { type: 'funnel', backgroundColor: DARK_BG },
+      title: { text: 'Conversion Funnel' },
+      plotOptions: {
+        series: {
+          dataLabels: {
+            enabled: true,
+            format: '<b>{point.name}</b>: {point.y}',
+            softConnector: true
+          },
+          center: ['50%', '50%'],
+          width: '80%'
+        }
+      },
+      credits: { enabled: false },
+      series: [
+        {
+          name: 'Users',
+          data: [
+            ['Views', agg.getSum('google', 'views')],
+            ['Website Clicks', agg.getSum('google', 'website clicks')],
+            ['Calls', agg.getSum('google', 'calls')],
+            ['Bookings', agg.getSum('google', 'booking clicks')]
+          ]
+        }
+      ]
     },
-    series: [
-      {
-        type: 'spline',
-        name: 'Likes per Follower',
-        color: '#F6AD55',
-        data: (() => {
-          const grouped: Record<string, { likes: number; followers: number }> = {}
-          metrics.forEach(row => {
-            const month = row.period
-            const likes = Number(row.metrics['likes'] || 0)
-            const followers = Number(row.metrics['new follows'] || 0)
-            if (!grouped[month]) grouped[month] = { likes: 0, followers: 0 }
-            grouped[month].likes += likes
-            grouped[month].followers += followers
-          })
-          return Object.entries(grouped)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([_, { likes, followers }]) =>
-              followers > 0 ? likes / followers : 0
-            )
-        })()
-      }
-    ]
-  },
-  {
-    chart: { type: 'pie' },
-    title: { text: 'Engagement Distribution' },
-    series: [
-      {
-        name: 'Engagement',
-        data: [
-          { name: 'Likes', y: totalLikes },
-          {
-            name: 'Clicks',
-            y:
-              agg.getSum('google', 'website clicks') +
-              agg.getSum('facebook', 'website clicks')
-          },
-          {
-            name: 'Comments',
-            y:
-              agg.getSum('facebook', 'comments') +
-              agg.getSum('instagram', 'comments')
-          },
-          {
-            name: 'Shares',
-            y:
-              agg.getSum('facebook', 'shares') +
-              agg.getSum('instagram', 'shares')
+    {
+      title: { text: 'Likes per Follower (All Platforms)' },
+      xAxis: {
+        categories: Array.from(new Set(metrics.map(row => row.period))).sort()
+      },
+      yAxis: {
+        title: { text: 'Ratio' },
+        labels: {
+          formatter () {
+            return this.value.toFixed(2)
           }
-        ]
-      }
-    ]
-  },
-  {
-    chart: { type: 'column' },
-    title: { text: 'Engagement Quality Overview' },
-    xAxis: {
-      categories: ['Likes', 'Comments', 'Shares', 'Clicks', 'Views'],
-      title: { text: 'Engagement Metric' }
+        }
+      },
+      tooltip: {
+        pointFormat: '<b>{point.y:.2f}</b> Likes per Follower'
+      },
+      series: [
+        {
+          type: 'spline',
+          name: 'Likes per Follower',
+          color: '#F6AD55',
+          data: (() => {
+            const grouped: Record<
+              string,
+              { likes: number; followers: number }
+            > = {}
+
+            metrics.forEach(row => {
+              const month = row.period
+              const likes = Number(row.metrics['likes'] || 0)
+              const followers = Number(row.metrics['new follows'] || 0)
+              if (!grouped[month]) grouped[month] = { likes: 0, followers: 0 }
+              grouped[month].likes += likes
+              grouped[month].followers += followers
+            })
+
+            return Object.entries(grouped)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([_, { likes, followers }]) =>
+                followers > 0 ? likes / followers : 0
+              )
+          })()
+        }
+      ]
     },
-    yAxis: [
-      {
-        title: { text: 'Count (Likes / Comments / Shares / Clicks)' },
+    {
+      chart: { type: 'pie' },
+      title: { text: 'Engagement Distribution' },
+      credits: { enabled: false },
+      series: [
+        {
+          name: 'Engagement',
+          data: [
+            { name: 'Likes', y: totalLikes },
+            {
+              name: 'Clicks',
+              y:
+                agg.getSum('google', 'website clicks') +
+                agg.getSum('facebook', 'website clicks')
+            },
+            {
+              name: 'Comments',
+              y:
+                agg.getSum('facebook', 'comments') +
+                agg.getSum('instagram', 'comments')
+            },
+            {
+              name: 'Shares',
+              y:
+                agg.getSum('facebook', 'shares') +
+                agg.getSum('instagram', 'shares')
+            }
+          ]
+        }
+      ]
+    },
+    {
+      chart: { type: 'column' },
+      title: { text: 'Engagement Quality Overview' },
+      credits: { enabled: false },
+      xAxis: {
+        categories: ['Likes', 'Comments', 'Shares', 'Clicks', 'Views'],
+        title: { text: 'Engagement Metric' }
+      },
+      yAxis: [
+        {
+          title: { text: 'Count (Likes / Comments / Shares / Clicks)' },
+          min: 0
+        },
+        {
+          title: { text: 'Views' },
+          opposite: true,
+          min: 0
+        }
+      ],
+      tooltip: {
+        shared: true
+      },
+      plotOptions: {
+        column: {
+          grouping: false,
+          borderWidth: 0,
+          dataLabels: { enabled: true }
+        }
+      },
+      series: [
+        {
+          name: 'Likes',
+          data: [totalLikes, null, null, null, null],
+          color: '#ED64A6',
+          pointPlacement: -0.2
+        },
+        {
+          name: 'Comments',
+          data: [
+            null,
+            agg.getSum('facebook', 'comments') +
+              agg.getSum('instagram', 'comments'),
+            null,
+            null,
+            null
+          ],
+          color: '#63B3ED',
+          pointPlacement: -0.1
+        },
+        {
+          name: 'Shares',
+          data: [
+            null,
+            null,
+            agg.getSum('facebook', 'shares') +
+              agg.getSum('instagram', 'shares'),
+            null,
+            null
+          ],
+          color: '#F6AD55',
+          pointPlacement: 0
+        },
+        {
+          name: 'Clicks',
+          data: [
+            null,
+            null,
+            null,
+            agg.getSum('google', 'website clicks') +
+              agg.getSum('facebook', 'website clicks'),
+            null
+          ],
+          color: '#68D391',
+          pointPlacement: 0.1
+        },
+        {
+          name: 'Views',
+          data: [null, null, null, null, totalViews],
+          yAxis: 1,
+          color: '#3182CE',
+          pointPlacement: 0.2
+        }
+      ]
+    },
+    {
+      chart: { polar: true, type: 'line' },
+      credits: { enabled: false },
+      title: { text: 'New Followers Per Platform' },
+      pane: { size: '80%' },
+      xAxis: {
+        categories: ['Facebook', 'Instagram', 'TikTok', 'X'],
+        tickmarkPlacement: 'on',
+        lineWidth: 0
+      },
+      yAxis: {
+        gridLineInterpolation: 'polygon',
+        lineWidth: 0,
         min: 0
       },
-      {
-        title: { text: 'Views' },
-        opposite: true,
-        min: 0
-      }
-    ],
-    tooltip: { shared: true },
-    plotOptions: {
-      column: {
-        grouping: false,
-        borderWidth: 0,
-        dataLabels: { enabled: true }
-      }
-    },
-    series: [
-      {
-        name: 'Likes',
-        data: [totalLikes, null, null, null, null],
-        color: '#ED64A6',
-        pointPlacement: -0.2
+      credits: { enabled: false },
+      tooltip: {
+        pointFormat: '<b>{point.y}</b> new follows'
       },
-      {
-        name: 'Comments',
-        data: [
-          null,
-          agg.getSum('facebook', 'comments') +
-            agg.getSum('instagram', 'comments'),
-          null,
-          null,
-          null
-        ],
-        color: '#63B3ED',
-        pointPlacement: -0.1
-      },
-      {
-        name: 'Shares',
-        data: [
-          null,
-          null,
-          agg.getSum('facebook', 'shares') +
-            agg.getSum('instagram', 'shares'),
-          null,
-          null
-        ],
-        color: '#F6AD55',
-        pointPlacement: 0
-      },
-      {
-        name: 'Clicks',
-        data: [
-          null,
-          null,
-          null,
-          agg.getSum('google', 'website clicks') +
-            agg.getSum('facebook', 'website clicks'),
-          null
-        ],
-        color: '#68D391',
-        pointPlacement: 0.1
-      },
-      {
-        name: 'Views',
-        data: [null, null, null, null, totalViews],
-        yAxis: 1,
-        color: '#3182CE',
-        pointPlacement: 0.2
-      }
-    ]
-  },
-  {
-    chart: { polar: true, type: 'line' },
-    title: { text: 'New Followers Per Platform' },
-    pane: { size: '80%' },
-    xAxis: {
-    categories: connectedPlatforms.map(pf => 
-      pf.charAt(0).toUpperCase() + pf.slice(1)
-    ),
-    lineWidth: 0,
-    tickmarkPlacement: 'on',
-    labels: {
-      style: { color: '#fff' }
+      series: [
+        {
+          name: 'New Followers',
+          data: [
+            agg.getSum('facebook', 'new follows'),
+            agg.getSum('instagram', 'new follows'),
+            agg.getSum('tiktok', 'new follows'),
+            agg.getSum('x', 'new follows')
+          ],
+          pointPlacement: 'on',
+          color: '#48BB78'
+        }
+      ]
     }
-  },
-    yAxis: {
-      gridLineInterpolation: 'polygon',
-      lineWidth: 0,
-      min: 0
-    },
-    credits: { enabled: false },
-    tooltip: {
-      pointFormat: '<b>{point.y}</b> new follows'
-    },
-    series: [
-      {
-        name: 'New Followers',
-        data: connectedPlatforms.map(pf => agg.getSum(pf, 'new follows')),
-        pointPlacement: 'on',
-        color: '#48BB78'
-      }
-    ]
-  }
-]
+  ]
 
   return (
     <Box style={{ minHeight: '100vh', padding: 32, background: '#191A1F' }}>
@@ -840,29 +1608,73 @@ const chartConfigs: HighchartsOptions[] = [
           Generate Report
         </Button>
       </Flex>
-      <Row gutter={16} style={{ marginBottom: 32, marginTop: 20 }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 32, marginTop: 20 }}>
         {visualSummary.map(({ label, value, color, icon }, idx) => (
-          <Col xs={24} sm={8} key={idx}>
+          <Col
+            key={idx}
+            xs={24} // 1 per row
+            sm={12} // 2 per row
+            md={12} // 2 per row
+            lg={8} // 3 per row
+            xl={6} // 4 per row
+            xxl={6} // 4 per row (wide screens)
+            style={{ display: 'flex' }} // make Card stretch height
+          >
             <Card
               bordered={false}
               style={{
                 background: '#23242A',
-                color: color,
-                minHeight: 90
+                color,
+                width: '100%'
+              }}
+              bodyStyle={{
+                padding: 16,
+                display: 'flex',
+                alignItems: 'center',
+                minHeight: 90,
+                width: '100%'
               }}
             >
-              <Flex align='center' style={{ gap: 16 }}>
-                <div>{icon}</div>
-                <div>
-                  <Text style={{ color: color, fontWeight: 700 }}>{label}</Text>
-                  <br />
-                  <Text style={{ color: color, fontSize: 26 }}>{value}</Text>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 16,
+                  width: '100%',
+                  flexWrap: 'wrap'
+                }}
+              >
+                <div style={{ flex: '0 0 auto' }}>{icon}</div>
+                <div style={{ flex: '1 1 0%', minWidth: 0 }}>
+                  <Text
+                    ellipsis
+                    style={{
+                      color,
+                      fontWeight: 700,
+                      display: 'block',
+                      maxWidth: '100%'
+                    }}
+                  >
+                    {label}
+                  </Text>
+                  <Text
+                    style={{
+                      color,
+                      fontSize: 'clamp(18px, 3.2vw, 26px)', // scales on small screens
+                      lineHeight: 1.1,
+                      fontVariantNumeric: 'tabular-nums',
+                      wordBreak: 'break-word'
+                    }}
+                  >
+                    {value}
+                  </Text>
                 </div>
-              </Flex>
+              </div>
             </Card>
           </Col>
         ))}
       </Row>
+
       <div ref={reportRef}>
         <Row gutter={[24, 24]}>
           <Col xs={24} md={12}>
@@ -878,29 +1690,17 @@ const chartConfigs: HighchartsOptions[] = [
                 </Text>
               }
               extra={
-            <Flex gap={6}>
-              <Button
-                size='small'
-                icon={<FiMaximize2 />}
-                onClick={() => setExpandedChart(chartConfigs[0])}
-              >
-                Expand
-              </Button>
-              <Button
-                size='small'
-                icon={<FiDownload />}
-                onClick={() =>
-            exportChartToImage(
-              chartConfigs[0],
-              "platform_metrics_view"
-            )
-          }
-              >
-                Download
-              </Button>
-            </Flex>
-          }
-
+                <Button
+                  size='small'
+                  onClick={() =>
+                    setExpandedChart(
+                      JSON.parse(JSON.stringify(chartConfigs[0]))
+                    )
+                  }
+                >
+                  Expand <MotionIcon style={{ marginLeft: 4 }} />
+                </Button>
+              }
               hoverable
             >
               <HighchartsReact
@@ -922,29 +1722,14 @@ const chartConfigs: HighchartsOptions[] = [
                   {chartConfigs[1]?.title?.text || `Chart 2`}
                 </Text>
               }
-extra={
-  <Flex gap={6}>
-    <Button
-      size='small'
-      icon={<FiMaximize2 />}
-      onClick={() => setExpandedChart(chartConfigs[1])}
-    >
-      Expand
-    </Button>
-    <Button
-      size='small'
-      icon={<FiDownload />}
-      onClick={() =>
-        exportChartToImage(
-          chartConfigs[1],
-          "conversion_funnel"
-        )
-      }
-    >
-      Download
-    </Button>
-  </Flex>
-}
+              extra={
+                <Button
+                  size='small'
+                  onClick={() => setExpandedChart({ ...chartConfigs[1] })}
+                >
+                  Expand <MotionIcon style={{ marginLeft: 4 }} />
+                </Button>
+              }
               hoverable
             >
               <HighchartsReact
@@ -967,31 +1752,14 @@ extra={
                     {config?.title?.text || `Chart ${idx + 3}`}
                   </Text>
                 }
-               extra={
-  <Flex gap={6}>
-    <Button
-      size='small'
-      icon={<FiMaximize2 />}
-      onClick={() => setExpandedChart(config)}
-    >
-      Expand
-    </Button>
-    <Button
-      size='small'
-      icon={<FiDownload />}
-      onClick={() =>
-        exportChartToImage(
-          config,
-          `${(config.title?.text || `chart_${idx + 3}`)
-            .replace(/\s+/g, '_')
-            .toLowerCase()}`
-        )
-      }
-    >
-      Download
-    </Button>
-  </Flex>
-}
+                extra={
+                  <Button
+                    size='small'
+                    onClick={() => setExpandedChart({ ...config })}
+                  >
+                    Expand <MotionIcon style={{ marginLeft: 4 }} />
+                  </Button>
+                }
                 hoverable
               >
                 <HighchartsReact highcharts={Highcharts} options={config} />
@@ -1254,9 +2022,43 @@ extra={
                 Prepared by: {modalReport.preparedBy}
               </Text>
             </div>
+
             <Button
               type='primary'
               icon={<FiDownload />}
+              onClick={() =>
+                generateSimplePdfWithWatermark({
+                  modalReport,
+                  platformMetricsHistory,
+                  dateRange,
+                  consolidatedChartRef,
+                  funnelChartRef
+                })
+              }
+            >
+              Export PDF
+            </Button>
+
+            <Button
+              type='primary'
+              icon={<FiDownload />}
+              disabled={!chartsReady}
+              onClick={async () =>
+                await exportReportToPdf(
+                  modalReport,
+                  platformMetricsHistory,
+                  consolidatedChartRef,
+                  funnelChartRef,
+                  dateRange
+                )
+              }
+            >
+              Export PDF Simpl
+            </Button>
+
+            <Button
+              type='default'
+              icon={<FileWordFilled />}
               disabled={!chartsReady}
               onClick={async () =>
                 await exportReportToWord(
@@ -1266,6 +2068,7 @@ extra={
                   funnelChartRef
                 )
               }
+              style={{ marginLeft: 10 }}
             >
               Download Word
             </Button>
