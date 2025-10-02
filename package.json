@@ -2,6 +2,7 @@
   "name": "digital-media-analytics",
   "version": "0.1.0",
   "private": true,
+  "engines": { "node": "18.x" },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",
     "@asseinfo/react-kanban": "^2.2.0",
