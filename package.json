@@ -2,8 +2,10 @@
   "name": "digital-media-analytics",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": "18.x" },
+ "engines": { "node": "20.x" },
   "dependencies": {
+     "react-refresh": "^0.14.0",
+    "react-scripts": "5.0.1"
     "@ant-design/icons": "^5.5.1",
     "@asseinfo/react-kanban": "^2.2.0",
     "@dnd-kit/core": "^6.1.0",
