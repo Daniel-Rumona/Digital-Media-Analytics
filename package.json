@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "engines": { "node": "20.x" },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",
     "@asseinfo/react-kanban": "^2.2.0",
@@ -38,12 +43,8 @@
     "@syncfusion/ej2-react-popups": "^19.4.52",
     "@syncfusion/ej2-react-richtexteditor": "^19.4.50",
     "@syncfusion/ej2-react-schedule": "^19.4.50",
-    "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^13.5.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@vercel/node": "^5.0.0",
     "antd": "^5.22.1",
     "axios": "^1.7.7",
     "class-variance-authority": "^0.7.0",
@@ -58,9 +59,7 @@
     "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18.3.1",
     "react-pro-sidebar": "^0.7.1",
-    "react-refresh": "^0.14.0",
     "react-router-dom": "^6.28.0",
-    "react-scripts": "5.0.1",
     "redux": "^5.0.1",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",
@@ -68,29 +67,13 @@
     "uuid": "^11.0.3",
     "web-vitals": "^2.1.4"
   },
-
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  }
-,
-
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
-  },
-  "browserslist": {
-    "production": [">0.2%", "not dead", "not op_mini all"],
-    "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
-  },
   "devDependencies": {
     "@types/geojson": "^7946.0.14",
     "@types/node": "20.x",
+    "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.14"
+    "tailwindcss": "^3.4.14",
+    "vite": "^5.4.10"
   }
 }
