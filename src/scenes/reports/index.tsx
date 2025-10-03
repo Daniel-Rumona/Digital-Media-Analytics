@@ -789,7 +789,7 @@ export default function ReportDashboard() {
     0
   );
 
-  const [oldFollowersTotal, setOldFollowersTotalState] = useState<number>(0); // keep local naming consistent
+ 
   useEffect(() => setOldFollowersTotalState(oldFollowersTotal), [oldFollowersTotal]);
 
   const followerGrowthPct =
@@ -1268,3 +1268,4 @@ export default function ReportDashboard() {
     </div>
   );
 }
+
