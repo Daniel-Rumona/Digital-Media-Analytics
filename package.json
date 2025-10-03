@@ -6,9 +6,9 @@
   
   "scripts": {
     "dev": "vite",
-    "build": "vite build",             // ← no tsc here
+    "build": "vite build",           
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json" // optional, run locally/CI only
+    "typecheck": "tsc -p tsconfig.json" 
   }
 ,
 
