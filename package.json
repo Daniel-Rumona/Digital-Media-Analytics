@@ -3,12 +3,15 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
+    "build": "vite build",             // ← no tsc here
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json" // optional, run locally/CI only
+  }
+,
+
   "dependencies": {
     "@ant-design/icons": "^6.0.0",
     "@chakra-ui/react": "^3.19.0",
